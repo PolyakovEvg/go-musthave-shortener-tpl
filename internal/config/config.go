@@ -7,7 +7,7 @@ type Config struct {
 
 const urlSuffix string = "/"
 
-func NewConfig(serverAddr, baseUrl string) *Config {
+func NewConfig(serverAddr, baseURL string) *Config {
 	cfg := &Config{
 		ServerAddress: ":8080",
 		BaseURL:       "http://localhost:8080/",
@@ -17,8 +17,8 @@ func NewConfig(serverAddr, baseUrl string) *Config {
 		cfg.ServerAddress = serverAddr
 	}
 
-	if baseUrl != "" {
-		cfg.BaseURL = baseUrl + urlSuffix
+	if baseURL != "" {
+		cfg.BaseURL = baseURL + urlSuffix
 	}
 
 	return cfg

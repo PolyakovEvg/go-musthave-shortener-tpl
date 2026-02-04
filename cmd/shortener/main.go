@@ -12,12 +12,12 @@ import (
 
 func main() {
 	serverAddr := flag.String("a", "", "Input server ServerAddress")
-	baseUrl := flag.String("b", "", "Input server BaseURL")
+	baseURL := flag.String("b", "", "Input server BaseURL")
 	flag.Parse()
 
-	fmt.Println(*serverAddr, *baseUrl)
+	fmt.Println(*serverAddr, *baseURL)
 
-	cfg := config.NewConfig(*serverAddr, *baseUrl)
+	cfg := config.NewConfig(*serverAddr, *baseURL)
 	storage := repository.NewStorage()
 	mux := handler.Router(storage, cfg)
 
