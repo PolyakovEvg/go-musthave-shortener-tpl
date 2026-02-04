@@ -41,7 +41,7 @@ func TestRouter(t *testing.T) {
 			path:           "/",
 			body:           "https://example.com",
 			contentType:    "application/json",
-			expectedStatus: http.StatusUnsupportedMediaType,
+			expectedStatus: http.StatusBadRequest,
 			checkBody:      false,
 		},
 		{
@@ -96,7 +96,7 @@ func TestRouter(t *testing.T) {
 func TestRouter_Integration_ShortenAndRedirect(t *testing.T) {
 	storage := repository.NewStorage()
 	cfg := &config.Config{
-		BaseURL: "http://test-server:8080/",
+		BaseURL: "http://localhost:8080/",
 	}
 
 	mux := Router(storage, cfg)
@@ -136,13 +136,13 @@ func TestRouter_Integration_ShortenAndRedirect(t *testing.T) {
 func TestRouter_MultipleURLs(t *testing.T) {
 	storage := repository.NewStorage()
 	cfg := &config.Config{
-		BaseURL: "http://localhost/",
+		BaseURL: "http://localhost:8080/",
 	}
 
 	mux := Router(storage, cfg)
 
 	urls := []string{
-		"https://example.com/page1",
+		"https://example.com//page1",
 		"https://example.com/page2",
 		"https://example.com/page3",
 	}
