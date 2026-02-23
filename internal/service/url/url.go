@@ -23,7 +23,7 @@ func NewURLService(repo Repository, baseURL string) *URLService {
 
 func (s *URLService) SaveShorten(original string) (string, error) {
 	if original == "" {
-		return "", errors.New("URL is empty")
+		return "", errors.New("url is empty")
 	}
 
 	id, err := s.repo.Save(original)
@@ -38,7 +38,7 @@ func (s *URLService) GetOriginal(id string) (string, error) {
 	url, ok := s.repo.Get(id)
 
 	if !ok {
-		return "", errors.New("Not found original URL")
+		return "", errors.New("not found original URL")
 	}
 	return url, nil
 }
