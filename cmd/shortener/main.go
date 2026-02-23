@@ -1,26 +1,26 @@
 package main
 
 import (
-	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
-	"PolyakovEvg/go-musthave-shortener-tpl/internal/handler"
-	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
 	"flag"
-	"fmt"
 	"log"
-	"net/http"
+
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/app"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
 )
 
 func main() {
-	serverAddr := flag.String("a", "", "Input server ServerAddress")
-	baseURL := flag.String("b", "", "Input server BaseURL")
+	serverAddr := flag.String("a", ":8080", "Server address")
+	baseURL := flag.String("b", "http://localhost:8080", "Base URL")
 	flag.Parse()
 
-	fmt.Println(*serverAddr, *baseURL)
-
 	cfg := config.NewConfig(*serverAddr, *baseURL)
-	repo := memory.New()
-	mux := handler.Router(repo, cfg)
 
-	log.Printf("Server starting on %s", cfg.ServerAddress)
-	log.Fatal(http.ListenAndServe(cfg.ServerAddress, mux))
+	a, err := app.New(cfg)
+	if err != nil {
+		log.Fatalf("app init failed: %v", err)
+	}
+
+	if err := a.Run(); err != nil {
+		log.Fatalf("app run failed: %v", err)
+	}
 }

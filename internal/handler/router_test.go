@@ -3,19 +3,32 @@ package handler
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
 )
 
-func TestRouter(t *testing.T) {
+func newTestRouter(cfg *config.Config) *chi.Mux {
 	repo := memory.New()
+	r := chi.NewRouter()
+
+	svc := url.NewURLService(repo, cfg.BaseURL)
+	h := NewURLHandler(svc)
+	h.Register(r)
+
+	return r
+}
+
+func TestRouter(t *testing.T) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080/",
 	}
 
-	mux := Router(repo, cfg)
+	mux := newTestRouter(cfg)
 
 	tests := []struct {
 		name           string
@@ -94,12 +107,11 @@ func TestRouter(t *testing.T) {
 }
 
 func TestRouter_Integration_ShortenAndRedirect(t *testing.T) {
-	repo := memory.New()
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080/",
 	}
 
-	mux := Router(repo, cfg)
+	mux := newTestRouter(cfg)
 
 	originalURL := "https://github.com/PolyakovEvg/go-musthave-shortener-tpl"
 	req1 := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(originalURL))
@@ -134,12 +146,11 @@ func TestRouter_Integration_ShortenAndRedirect(t *testing.T) {
 }
 
 func TestRouter_MultipleURLs(t *testing.T) {
-	repo := memory.New()
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080/",
 	}
 
-	mux := Router(repo, cfg)
+	mux := newTestRouter(cfg)
 
 	urls := []string{
 		"https://example.com//page1",

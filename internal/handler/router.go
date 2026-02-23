@@ -1,14 +1,12 @@
 package handler
 
 import (
-	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 type URLHandler struct {
@@ -78,18 +76,4 @@ func (h *URLHandler) redirectURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, originalURL, http.StatusTemporaryRedirect)
-}
-
-func Router(repo url.Repository, cfg *config.Config) *chi.Mux {
-	r := chi.NewRouter()
-
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Compress(5))
-
-	svc := url.NewURLService(repo, cfg.BaseURL)
-	handler := NewURLHandler(svc)
-	handler.Register(r)
-
-	return r
 }
