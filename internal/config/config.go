@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strings"
+)
 
 type Config struct {
 	ServerAddress string
@@ -10,7 +13,6 @@ type Config struct {
 const (
 	EnvServerAddress string = "SERVER_ADDRESS"
 	EnvBaseURL       string = "BASE_URL"
-	urlSuffix        string = "/"
 )
 
 func NewConfig(flagAddr, flagBaseURL string) *Config {
@@ -29,10 +31,12 @@ func NewConfig(flagAddr, flagBaseURL string) *Config {
 	}
 
 	if envBaseURL != "" {
-		cfg.BaseURL = envBaseURL + urlSuffix
+		cfg.BaseURL = envBaseURL
 	} else if flagBaseURL != "" {
-		cfg.BaseURL = flagBaseURL + urlSuffix
+		cfg.BaseURL = flagBaseURL
 	}
+
+	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/") + "/"
 
 	return cfg
 }
