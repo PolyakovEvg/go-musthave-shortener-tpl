@@ -1,6 +1,7 @@
 package app
 
 import (
+	"log"
 	"net/http"
 
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
@@ -23,6 +24,7 @@ type App struct {
 func New(cfg *config.Config) (*App, error) {
 	logg, err := logger.NewLogger(zap.InfoLevel)
 	if err != nil {
+		log.Fatalf("can't initialize zap logger: %v", err)
 		return nil, err
 	}
 

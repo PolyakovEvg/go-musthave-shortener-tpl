@@ -16,6 +16,7 @@ func main() {
 	cfg := config.NewConfig(*serverAddr, *baseURL)
 
 	a, err := app.New(cfg)
+
 	if err != nil {
 		log.Fatalf("app init failed: %v", err)
 	}
