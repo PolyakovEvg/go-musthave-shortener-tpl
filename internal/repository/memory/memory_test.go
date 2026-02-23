@@ -1,11 +1,11 @@
-package repository
+package memory
 
 import (
 	"strings"
 	"testing"
 )
 
-func TestStorage_Save(t *testing.T) {
+func TestRepository_Save(t *testing.T) {
 	tests := []struct {
 		name    string
 		url     string
@@ -40,9 +40,9 @@ func TestStorage_Save(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage := NewStorage()
+			repo := New()
 
-			shortID, err := storage.Save(tt.url)
+			shortID, err := repo.Save(tt.url)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Save() error = %v, wantErr %v", err, tt.wantErr)
@@ -54,9 +54,9 @@ func TestStorage_Save(t *testing.T) {
 					t.Error("Save() returned empty short ID")
 				}
 
-				savedURL, exists := storage.data[shortID]
+				savedURL, exists := repo.data[shortID]
 				if !exists {
-					t.Error("URL was not saved in storage")
+					t.Error("URL was not saved in memory storage")
 				}
 
 				if savedURL != tt.url {
@@ -67,11 +67,11 @@ func TestStorage_Save(t *testing.T) {
 	}
 }
 
-func TestStorage_Get(t *testing.T) {
-	storage := NewStorage()
+func TestRepository_Get(t *testing.T) {
+	repo := New()
 
 	testURL := "https://example.com"
-	shortID, err := storage.Save(testURL)
+	shortID, err := repo.Save(testURL)
 	if err != nil {
 		t.Fatalf("Save() failed: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestStorage_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			url, ok := storage.Get(tt.id)
+			url, ok := repo.Get(tt.id)
 
 			if ok != tt.wantOk {
 				t.Errorf("Get() ok = %v, want %v", ok, tt.wantOk)

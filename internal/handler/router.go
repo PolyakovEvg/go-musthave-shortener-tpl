@@ -2,8 +2,7 @@ package handler
 
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
-	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
-	"fmt"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 	"io"
 	"net/http"
 	"strings"
@@ -13,27 +12,38 @@ import (
 )
 
 type URLHandler struct {
-	storage *repository.Storage
-	baseURL string
+	service *url.URLService
 }
 
-func NewURLHandler(storage *repository.Storage, baseURL string) *URLHandler {
+func (h *URLHandler) Register(r chi.Router) {
+	r.Post("/", h.shortenURL)
+	r.Get("/{id}", h.redirectURL)
+
+	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+	})
+
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+	})
+}
+
+func NewURLHandler(svc *url.URLService) *URLHandler {
 	return &URLHandler{
-		storage: storage,
-		baseURL: baseURL,
+		service: svc,
 	}
 }
 
 func (h *URLHandler) shortenURL(w http.ResponseWriter, r *http.Request) {
 	ct := r.Header.Get("Content-Type")
 	if ct != "text/plain" {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
@@ -41,17 +51,15 @@ func (h *URLHandler) shortenURL(w http.ResponseWriter, r *http.Request) {
 
 	originalURL := strings.TrimSpace(string(body))
 	if originalURL == "" {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
-	shortID, err := h.storage.Save(originalURL)
+	shortURL, err := h.service.SaveShorten(originalURL)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-
-	shortURL := h.baseURL + shortID
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
@@ -62,39 +70,26 @@ func (h *URLHandler) redirectURL(w http.ResponseWriter, r *http.Request) {
 	shortID := chi.URLParam(r, "id")
 
 	shortID = strings.TrimPrefix(shortID, "/")
+	originalURL, err := h.service.GetOriginal(shortID)
 
-	fmt.Println("shortURL", shortID)
-	originalURL, exists := h.storage.Get(shortID)
-	if !exists {
-		http.Error(w, "Not found", http.StatusBadRequest)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
 
 	http.Redirect(w, r, originalURL, http.StatusTemporaryRedirect)
 }
 
-func (h *URLHandler) RegisterRoutes(r chi.Router) {
-	r.Post("/", h.shortenURL)
-	r.Get("/{id}", h.redirectURL)
-
-	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "Method not allowed", http.StatusBadRequest)
-	})
-
-	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "Method not allowed", http.StatusBadRequest)
-	})
-}
-
-func Router(s *repository.Storage, cfg *config.Config) *chi.Mux {
+func Router(repo url.Repository, cfg *config.Config) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 
-	handler := NewURLHandler(s, cfg.BaseURL)
-	handler.RegisterRoutes(r)
+	svc := url.NewURLService(repo, cfg.BaseURL)
+	handler := NewURLHandler(svc)
+	handler.Register(r)
 
 	return r
 }

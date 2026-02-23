@@ -3,7 +3,7 @@ package main
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/handler"
-	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
 	"flag"
 	"fmt"
 	"log"
@@ -18,8 +18,8 @@ func main() {
 	fmt.Println(*serverAddr, *baseURL)
 
 	cfg := config.NewConfig(*serverAddr, *baseURL)
-	storage := repository.NewStorage()
-	mux := handler.Router(storage, cfg)
+	repo := memory.New()
+	mux := handler.Router(repo, cfg)
 
 	log.Printf("Server starting on %s", cfg.ServerAddress)
 	log.Fatal(http.ListenAndServe(cfg.ServerAddress, mux))
