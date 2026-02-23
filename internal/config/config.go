@@ -8,8 +8,9 @@ type Config struct {
 }
 
 const (
-	EnvServerAddress = "SERVER_ADDRESS"
-	EnvBaseURL       = "BASE_URL"
+	EnvServerAddress string = "SERVER_ADDRESS"
+	EnvBaseURL       string = "BASE_URL"
+	urlSuffix        string = "/"
 )
 
 func NewConfig(flagAddr, flagBaseURL string) *Config {
@@ -19,7 +20,7 @@ func NewConfig(flagAddr, flagBaseURL string) *Config {
 	}
 
 	envAddr := os.Getenv(EnvServerAddress)
-	envBase := os.Getenv(EnvBaseURL)
+	envBaseURL := os.Getenv(EnvBaseURL)
 
 	if envAddr != "" {
 		cfg.ServerAddress = envAddr
@@ -27,10 +28,10 @@ func NewConfig(flagAddr, flagBaseURL string) *Config {
 		cfg.ServerAddress = flagAddr
 	}
 
-	if envBase != "" {
-		cfg.BaseURL = envBase
+	if envBaseURL != "" {
+		cfg.BaseURL = envBaseURL + urlSuffix
 	} else if flagBaseURL != "" {
-		cfg.BaseURL = flagBaseURL
+		cfg.BaseURL = flagBaseURL + urlSuffix
 	}
 
 	return cfg
