@@ -45,13 +45,13 @@ func TestRepository_Save(t *testing.T) {
 			shortID, err := repo.Save(tt.url)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Save() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("save() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			if !tt.wantErr {
 				if shortID == "" {
-					t.Error("Save() returned empty short ID")
+					t.Error("save() returned empty short ID")
 				}
 
 				savedURL, exists := repo.data[shortID]
