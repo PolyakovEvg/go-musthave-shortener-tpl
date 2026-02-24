@@ -91,6 +91,7 @@ func (h *URLHandler) postShorten(w http.ResponseWriter, r *http.Request) {
 
 	if ct != "application/json" {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
 	}
 
 	body, err := io.ReadAll(r.Body)
@@ -109,6 +110,7 @@ func (h *URLHandler) postShorten(w http.ResponseWriter, r *http.Request) {
 
 	if req.URL == "" {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
 	}
 
 	shortURL, err := h.service.SaveShorten(req.URL)

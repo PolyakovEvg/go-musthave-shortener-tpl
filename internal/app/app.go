@@ -6,6 +6,7 @@ import (
 
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/handler"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/compressor"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/logger"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
@@ -31,7 +32,9 @@ func New(cfg *config.Config) (*App, error) {
 	repo := memory.New()
 	r := chi.NewRouter()
 
+	r.Use(compressor.WithGzip)
 	r.Use(logg.WithLogging)
+	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 
