@@ -2,6 +2,7 @@ package handler
 
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -12,10 +13,17 @@ import (
 type URLHandler struct {
 	service *url.URLService
 }
+type shortenRequest struct {
+	URL string `json:"url"`
+}
+type shortenResponse struct {
+	Result string `json:"result"`
+}
 
 func (h *URLHandler) Register(r chi.Router) {
 	r.Post("/", h.shortenURL)
 	r.Get("/{id}", h.redirectURL)
+	r.Post("/{api}/{shorten}", h.postShorten)
 
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -76,4 +84,49 @@ func (h *URLHandler) redirectURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, originalURL, http.StatusTemporaryRedirect)
+}
+
+func (h *URLHandler) postShorten(w http.ResponseWriter, r *http.Request) {
+	ct := r.Header.Get("Content-Type")
+
+	if ct != "application/json" {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+	}
+
+	body, err := io.ReadAll(r.Body)
+
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	var req shortenRequest
+	if err = json.Unmarshal(body, &req); err != nil {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
+	if req.URL == "" {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+	}
+
+	shortURL, err := h.service.SaveShorten(req.URL)
+
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	resp := shortenResponse{
+		Result: shortURL,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 }
