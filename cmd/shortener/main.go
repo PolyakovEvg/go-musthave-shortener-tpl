@@ -11,9 +11,11 @@ import (
 func main() {
 	serverAddr := flag.String("a", ":8080", "Server address")
 	baseURL := flag.String("b", "http://localhost:8080", "Base URL")
+	fpath := flag.String("f", "data/storage.json", "File Path")
+
 	flag.Parse()
 
-	cfg := config.NewConfig(*serverAddr, *baseURL)
+	cfg := config.NewConfig(*serverAddr, *baseURL, *fpath)
 
 	a, err := app.New(cfg)
 

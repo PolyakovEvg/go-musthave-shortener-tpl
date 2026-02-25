@@ -8,7 +8,7 @@ import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/handler"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/compressor"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/logger"
-	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/file"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 
 	"github.com/go-chi/chi/v5"
@@ -29,7 +29,12 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	repo := memory.New()
+	// repo := memory.New()
+	repo, err := file.New(cfg.FilePath)
+	if err != nil {
+		logg.Zap.Sugar().Fatalf("can't initialize file repository %v", err)
+	}
+
 	r := chi.NewRouter()
 
 	r.Use(compressor.WithGzip)
