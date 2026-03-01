@@ -8,9 +8,29 @@ import (
 	"strings"
 )
 
+var allowedContentTypes = []string{
+	"application/json",
+	"text/html",
+}
+
+func shouldCompress(ct string) bool {
+	if ct == "" {
+		return false
+	}
+
+	for _, allowed := range allowedContentTypes {
+		if strings.Contains(ct, allowed) {
+			return true
+		}
+	}
+	return false
+}
+
 type gzipWriter struct {
 	http.ResponseWriter
-	Writer io.Writer
+	writer          io.Writer
+	gz              *gzip.Writer
+	clientSupportGz bool // Добавляем флаг
 }
 
 func WithGzip(next http.Handler) http.Handler {
@@ -18,32 +38,47 @@ func WithGzip(next http.Handler) http.Handler {
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 			reader, err := gzip.NewReader(r.Body)
 			if err != nil {
-				log.Println("decompress error", err)
-				next.ServeHTTP(w, r)
-				return
+				log.Println("decompress error:", err)
+			} else {
+				defer reader.Close()
+				r.Body = reader
 			}
-			defer reader.Close()
-			r.Body = reader
 		}
 
-		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			next.ServeHTTP(w, r)
-			return
+		clientSupportGz := strings.Contains(r.Header.Get("Accept-Encoding"), "gzip")
+
+		gzw := &gzipWriter{
+			ResponseWriter:  w,
+			writer:          w,
+			clientSupportGz: clientSupportGz,
 		}
 
-		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
-		if err != nil {
-			log.Println("compress error", err)
-			next.ServeHTTP(w, r)
-			return
-		}
+		next.ServeHTTP(gzw, r)
 
-		defer gz.Close()
-		w.Header().Set("Content-Encoding", "gzip")
-		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
+		if gzw.gz != nil {
+			gzw.gz.Close()
+		}
 	})
 }
 
-func (w gzipWriter) Write(b []byte) (int, error) {
-	return w.Writer.Write(b)
+func (w *gzipWriter) WriteHeader(statusCode int) {
+	if w.clientSupportGz {
+		contentType := w.Header().Get("Content-Type")
+
+		if shouldCompress(contentType) {
+			gz, err := gzip.NewWriterLevel(w.ResponseWriter, gzip.BestSpeed)
+			if err == nil {
+				w.Header().Set("Content-Encoding", "gzip")
+				w.Header().Del("Content-Length")
+				w.gz = gz
+				w.writer = gz
+			}
+		}
+	}
+
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *gzipWriter) Write(b []byte) (int, error) {
+	return w.writer.Write(b)
 }

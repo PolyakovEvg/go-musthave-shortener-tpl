@@ -7,7 +7,7 @@ import (
 
 type MemoryRepository struct {
 	data map[string]string
-	mu   sync.Mutex
+	mu   sync.RWMutex
 }
 
 func New() *MemoryRepository {
@@ -16,24 +16,24 @@ func New() *MemoryRepository {
 	}
 }
 
-func (s *MemoryRepository) Save(url string) (string, error) {
+func (mr *MemoryRepository) Save(url string) (string, error) {
 	safeStr, err := randstr.GenerateRandomStringURLSafe(8)
 
 	if err != nil {
 		return "", err
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	mr.mu.RLock()
+	defer mr.mu.RUnlock()
 
-	s.data[safeStr] = url
+	mr.data[safeStr] = url
 	return safeStr, nil
 }
 
-func (s *MemoryRepository) Get(id string) (string, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (mr *MemoryRepository) Get(id string) (string, bool) {
+	mr.mu.RLock()
+	defer mr.mu.RUnlock()
 
-	url, exists := s.data[id]
+	url, exists := mr.data[id]
 	return url, exists
 }

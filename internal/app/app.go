@@ -41,7 +41,6 @@ func New(cfg *config.Config) (*App, error) {
 	r.Use(logg.WithLogging)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Compress(5))
 
 	svc := url.NewURLService(repo, cfg.BaseURL)
 	handler := handler.NewURLHandler(svc)
