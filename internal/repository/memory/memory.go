@@ -23,8 +23,8 @@ func (mr *MemoryRepository) Save(url string) (string, error) {
 		return "", err
 	}
 
-	mr.mu.RLock()
-	defer mr.mu.RUnlock()
+	mr.mu.Lock()
+	defer mr.mu.Unlock()
 
 	mr.data[safeStr] = url
 	return safeStr, nil
