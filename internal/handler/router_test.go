@@ -2,20 +2,34 @@ package handler
 
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
-	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
 )
 
+func newTestRouter(cfg *config.Config) *chi.Mux {
+	repo := memory.New()
+	r := chi.NewRouter()
+
+	svc := url.NewURLService(repo, cfg.BaseURL)
+	h := NewURLHandler(svc)
+	h.Register(r)
+
+	return r
+}
+
 func TestRouter(t *testing.T) {
-	storage := repository.NewStorage()
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080/",
 	}
 
-	mux := Router(storage, cfg)
+	mux := newTestRouter(cfg)
 
 	tests := []struct {
 		name           string
@@ -94,12 +108,11 @@ func TestRouter(t *testing.T) {
 }
 
 func TestRouter_Integration_ShortenAndRedirect(t *testing.T) {
-	storage := repository.NewStorage()
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080/",
 	}
 
-	mux := Router(storage, cfg)
+	mux := newTestRouter(cfg)
 
 	originalURL := "https://github.com/PolyakovEvg/go-musthave-shortener-tpl"
 	req1 := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(originalURL))
@@ -134,12 +147,11 @@ func TestRouter_Integration_ShortenAndRedirect(t *testing.T) {
 }
 
 func TestRouter_MultipleURLs(t *testing.T) {
-	storage := repository.NewStorage()
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080/",
 	}
 
-	mux := Router(storage, cfg)
+	mux := newTestRouter(cfg)
 
 	urls := []string{
 		"https://example.com//page1",
@@ -183,5 +195,132 @@ func TestRouter_MultipleURLs(t *testing.T) {
 		if location != urls[i] {
 			t.Errorf("expected %q, got %q", urls[i], location)
 		}
+	}
+}
+
+func TestAPI_ShortenURL(t *testing.T) {
+	cfg := &config.Config{
+		BaseURL: "http://localhost:8080/",
+	}
+	mux := newTestRouter(cfg)
+
+	tests := []struct {
+		name           string
+		method         string
+		path           string
+		body           interface{}
+		contentType    string
+		expectedStatus int
+		checkResponse  bool
+	}{
+		{
+			name:   "Valid JSON request",
+			method: http.MethodPost,
+			path:   "/api/shortener",
+			body: shortenRequest{
+				URL: "https://example.com",
+			},
+			contentType:    "application/json",
+			expectedStatus: http.StatusCreated,
+			checkResponse:  true,
+		},
+		{
+			name:           "Wrong content type",
+			method:         http.MethodPost,
+			path:           "/api/shortener",
+			body:           "https://example.com",
+			contentType:    "text/plain",
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  false,
+		},
+		{
+			name:           "Invalid JSON",
+			method:         http.MethodPost,
+			path:           "/api/shortener",
+			body:           `{"invalid": "json"`,
+			contentType:    "application/json",
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  false,
+		},
+		{
+			name:   "Empty URL",
+			method: http.MethodPost,
+			path:   "/api/shortener",
+			body: shortenRequest{
+				URL: "",
+			},
+			contentType:    "application/json",
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  false,
+		},
+		{
+			name:           "Missing URL field",
+			method:         http.MethodPost,
+			path:           "/api/shortener",
+			body:           map[string]string{},
+			contentType:    "application/json",
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  false,
+		},
+		{
+			name:           "Empty body",
+			method:         http.MethodPost,
+			path:           "/api/shortener",
+			body:           "",
+			contentType:    "application/json",
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  false,
+		},
+		{
+			name:   "URL with spaces",
+			method: http.MethodPost,
+			path:   "/api/shortener",
+			body: shortenRequest{
+				URL: "  https://example.com  ",
+			},
+			contentType:    "application/json",
+			expectedStatus: http.StatusCreated,
+			checkResponse:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var reqBody string
+			switch v := tt.body.(type) {
+			case string:
+				reqBody = v
+			default:
+				jsonBody, _ := json.Marshal(v)
+				reqBody = string(jsonBody)
+			}
+
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(reqBody))
+			req.Header.Set("Content-Type", tt.contentType)
+
+			rr := httptest.NewRecorder()
+			mux.ServeHTTP(rr, req)
+
+			if rr.Code != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d", tt.expectedStatus, rr.Code)
+			}
+
+			if tt.checkResponse && tt.expectedStatus == http.StatusCreated {
+				var resp shortenResponse
+				err := json.NewDecoder(rr.Body).Decode(&resp)
+				if err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+
+				if !strings.HasPrefix(resp.Result, cfg.BaseURL) {
+					t.Errorf("expected result to start with %s, got %s", cfg.BaseURL, resp.Result)
+				}
+
+				contentType := rr.Header().Get("Content-Type")
+				if contentType != "application/json" {
+					t.Errorf("expected Content-Type application/json, got %s", contentType)
+				}
+			}
+		})
 	}
 }
