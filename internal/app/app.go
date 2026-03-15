@@ -43,7 +43,7 @@ func New(cfg *config.Config) (*App, error) {
 	r.Use(middleware.Recoverer)
 
 	svc := url.NewURLService(repo, cfg.BaseURL)
-	handler := handler.NewURLHandler(svc)
+	handler := handler.NewURLHandler(svc, cfg)
 	handler.Register(r)
 
 	server := &http.Server{
