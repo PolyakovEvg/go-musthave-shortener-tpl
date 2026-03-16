@@ -1,0 +1,5 @@
+CREATE TABLE shorten_urls (
+    id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    original_url VARCHAR(255) NOT NULL,
+    short_url VARCHAR(255) NOT NULL
+);

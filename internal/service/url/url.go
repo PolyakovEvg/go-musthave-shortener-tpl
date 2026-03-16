@@ -1,20 +1,16 @@
 package url
 
 import (
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
 	"errors"
 )
 
-type Repository interface {
-	Save(string) (string, error)
-	Get(string) (string, bool)
-}
-
 type URLService struct {
-	repo    Repository
+	repo    repository.Repository
 	baseURL string
 }
 
-func NewURLService(repo Repository, baseURL string) *URLService {
+func NewURLService(repo repository.Repository, baseURL string) *URLService {
 	return &URLService{
 		repo:    repo,
 		baseURL: baseURL,
