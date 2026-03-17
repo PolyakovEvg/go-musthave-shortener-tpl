@@ -1,20 +1,17 @@
 package url
 
 import (
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/model"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
 	"errors"
 )
 
-type Repository interface {
-	Save(string) (string, error)
-	Get(string) (string, bool)
-}
-
 type URLService struct {
-	repo    Repository
+	repo    repository.Repository
 	baseURL string
 }
 
-func NewURLService(repo Repository, baseURL string) *URLService {
+func NewURLService(repo repository.Repository, baseURL string) *URLService {
 	return &URLService{
 		repo:    repo,
 		baseURL: baseURL,
@@ -41,4 +38,21 @@ func (s *URLService) GetOriginal(id string) (string, error) {
 		return "", errors.New("not found original URL")
 	}
 	return url, nil
+}
+
+func (s *URLService) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {
+	if len(batch) == 0 {
+		return nil, errors.New("empty batch")
+	}
+
+	responses, err := s.repo.SaveBatch(batch)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range responses {
+		responses[i].ShortURL = s.baseURL + responses[i].ShortURL
+	}
+
+	return responses, nil
 }

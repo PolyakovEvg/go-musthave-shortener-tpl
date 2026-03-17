@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 	"encoding/json"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 type URLHandler struct {
 	service *url.URLService
+	config  *config.Config
 }
 type shortenRequest struct {
 	URL string `json:"url"`
@@ -24,6 +26,8 @@ func (h *URLHandler) Register(r chi.Router) {
 	r.Post("/", h.shortenURL)
 	r.Get("/{id}", h.redirectURL)
 	r.Post("/{api}/{shorten}", h.postShorten)
+	r.Get("/ping", h.ping)
+	r.Post("/{api}/{shorten}/{batch}", h.ShortenBatch)
 
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -34,9 +38,10 @@ func (h *URLHandler) Register(r chi.Router) {
 	})
 }
 
-func NewURLHandler(svc *url.URLService) *URLHandler {
+func NewURLHandler(svc *url.URLService, cfg *config.Config) *URLHandler {
 	return &URLHandler{
 		service: svc,
+		config:  cfg,
 	}
 }
 

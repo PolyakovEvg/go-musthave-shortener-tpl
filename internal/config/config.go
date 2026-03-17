@@ -9,40 +9,50 @@ type Config struct {
 	ServerAddress string
 	BaseURL       string
 	FilePath      string
+	DBDSN         string
 }
 
 const (
 	EnvServerAddress string = "SERVER_ADDRESS"
 	EnvBaseURL       string = "BASE_URL"
 	EnvFilePath      string = "FILE_STORAGE_PATH"
+	EnvDB            string = "DATABASE_DSN"
 )
 
-func NewConfig(flagAddr, flagBaseURL, flagFilePath string) *Config {
+func NewConfig(params Config) *Config {
 	cfg := &Config{
 		ServerAddress: ":8080",
 		BaseURL:       "http://localhost:8080/",
 		FilePath:      "data/storage.json",
+		DBDSN:         "",
 	}
 
 	envAddr, ok := os.LookupEnv(EnvServerAddress)
 	if ok {
 		cfg.ServerAddress = envAddr
-	} else if flagAddr != "" {
-		cfg.ServerAddress = flagAddr
+	} else if params.ServerAddress != "" {
+		cfg.ServerAddress = params.ServerAddress
 	}
 
 	envBaseURL, ok := os.LookupEnv(EnvBaseURL)
 	if ok {
 		cfg.BaseURL = envBaseURL
-	} else if flagBaseURL != "" {
-		cfg.BaseURL = flagBaseURL
+	} else if params.BaseURL != "" {
+		cfg.BaseURL = params.BaseURL
 	}
 
 	envFilePath, ok := os.LookupEnv(EnvFilePath)
 	if ok {
 		cfg.FilePath = envFilePath
-	} else if flagFilePath != "" {
-		cfg.FilePath = flagFilePath
+	} else if params.FilePath != "" {
+		cfg.FilePath = params.FilePath
+	}
+
+	envDB, ok := os.LookupEnv(EnvDB)
+	if ok {
+		cfg.DBDSN = envDB
+	} else if params.DBDSN != "" {
+		cfg.DBDSN = params.DBDSN
 	}
 
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/") + "/"

@@ -111,6 +111,72 @@ func (r *FileRepository) Save(originalURL string) (string, error) {
 	return shortID, nil
 }
 
+func (r *FileRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	responses := make([]model.BatchResponse, 0, len(batch))
+	newRecords := make([]model.FileRecord, 0, len(batch))
+
+	for _, req := range batch {
+		var existingShort string
+		var found bool
+
+		for _, rec := range r.data {
+			if rec.OriginalURL == req.OriginalURL {
+				existingShort = rec.ShortURL
+				found = true
+				break
+			}
+		}
+
+		if found {
+			responses = append(responses, model.BatchResponse{
+				CorrelationID: req.CorrelationID,
+				ShortURL:      existingShort,
+			})
+			continue
+		}
+
+		shortID, err := randstr.GenerateRandomStringURLSafe(8)
+		if err != nil {
+			log.Printf("Error generating random string: %v", err)
+			return nil, err
+		}
+
+		r.counter++
+		uuid := fmt.Sprintf("%d", r.counter)
+
+		rec := model.FileRecord{
+			UUID:        uuid,
+			ShortURL:    shortID,
+			OriginalURL: req.OriginalURL,
+		}
+
+		r.data[shortID] = rec
+		newRecords = append(newRecords, rec)
+
+		responses = append(responses, model.BatchResponse{
+			CorrelationID: req.CorrelationID,
+			ShortURL:      shortID,
+		})
+
+		log.Printf("Created record: UUID=%s, ShortURL=%s, OriginalURL=%s",
+			uuid, shortID, req.OriginalURL)
+	}
+
+	if len(newRecords) > 0 {
+		log.Printf("Flushing %d new records to file", len(newRecords))
+		if err := r.flush(); err != nil {
+			log.Printf("Error flushing data to file: %v", err)
+			return nil, err
+		}
+	}
+
+	log.Printf("Successfully saved batch of %d URLs", len(batch))
+	return responses, nil
+}
+
 func (r *FileRepository) Get(shortURL string) (string, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

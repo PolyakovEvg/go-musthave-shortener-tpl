@@ -8,7 +8,10 @@ import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/handler"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/compressor"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/logger"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/db"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/file"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 
 	"github.com/go-chi/chi/v5"
@@ -29,8 +32,7 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	// repo := memory.New()
-	repo, err := file.New(cfg.FilePath)
+	repo, err := chooseRepository(cfg, logg)
 	if err != nil {
 		logg.Zap.Sugar().Fatalf("can't initialize file repository %v", err)
 	}
@@ -43,7 +45,7 @@ func New(cfg *config.Config) (*App, error) {
 	r.Use(middleware.Recoverer)
 
 	svc := url.NewURLService(repo, cfg.BaseURL)
-	handler := handler.NewURLHandler(svc)
+	handler := handler.NewURLHandler(svc, cfg)
 	handler.Register(r)
 
 	server := &http.Server{
@@ -67,4 +69,19 @@ func (a *App) Run() error {
 	)
 
 	return a.server.ListenAndServe()
+}
+
+func chooseRepository(cfg *config.Config, logg *logger.Logger) (repository.Repository, error) {
+	if cfg.DBDSN != "" {
+		logg.Zap.Sugar().Info("using database storage")
+		return db.New(cfg.DBDSN)
+	}
+
+	if cfg.FilePath != "" {
+		logg.Zap.Sugar().Info("using file storage")
+		return file.New(cfg.FilePath)
+	}
+
+	logg.Zap.Sugar().Info("using in-memory storage")
+	return memory.New(), nil
 }

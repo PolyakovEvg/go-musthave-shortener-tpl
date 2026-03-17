@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/model"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/randstr"
 	"sync"
 )
@@ -17,8 +18,16 @@ func New() *MemoryRepository {
 }
 
 func (mr *MemoryRepository) Save(url string) (string, error) {
-	safeStr, err := randstr.GenerateRandomStringURLSafe(8)
+	mr.mu.RLock()
+	for short, existingURL := range mr.data {
+		if existingURL == url {
+			mr.mu.RUnlock()
+			return short, nil
+		}
+	}
+	mr.mu.RUnlock()
 
+	shortID, err := randstr.GenerateRandomStringURLSafe(8)
 	if err != nil {
 		return "", err
 	}
@@ -26,8 +35,14 @@ func (mr *MemoryRepository) Save(url string) (string, error) {
 	mr.mu.Lock()
 	defer mr.mu.Unlock()
 
-	mr.data[safeStr] = url
-	return safeStr, nil
+	for short, existingURL := range mr.data {
+		if existingURL == url {
+			return short, nil
+		}
+	}
+
+	mr.data[shortID] = url
+	return shortID, nil
 }
 
 func (mr *MemoryRepository) Get(id string) (string, bool) {
@@ -36,4 +51,43 @@ func (mr *MemoryRepository) Get(id string) (string, bool) {
 
 	url, exists := mr.data[id]
 	return url, exists
+}
+
+func (mr *MemoryRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {
+	mr.mu.Lock()
+	defer mr.mu.Unlock()
+
+	responses := make([]model.BatchResponse, 0, len(batch))
+
+	for _, req := range batch {
+		found := false
+		for short, existingURL := range mr.data {
+			if existingURL == req.OriginalURL {
+				responses = append(responses, model.BatchResponse{
+					CorrelationID: req.CorrelationID,
+					ShortURL:      short,
+				})
+				found = true
+				break
+			}
+		}
+
+		if found {
+			continue
+		}
+
+		shortID, err := randstr.GenerateRandomStringURLSafe(8)
+		if err != nil {
+			return nil, err
+		}
+
+		mr.data[shortID] = req.OriginalURL
+
+		responses = append(responses, model.BatchResponse{
+			CorrelationID: req.CorrelationID,
+			ShortURL:      shortID,
+		})
+	}
+
+	return responses, nil
 }
