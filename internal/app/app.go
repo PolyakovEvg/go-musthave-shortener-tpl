@@ -32,7 +32,7 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	repo, err := chooseRepository(cfg, logg)
+	repo, err := initRepository(cfg, logg)
 	if err != nil {
 		logg.Zap.Sugar().Fatalf("can't initialize file repository %v", err)
 	}
@@ -71,7 +71,7 @@ func (a *App) Run() error {
 	return a.server.ListenAndServe()
 }
 
-func chooseRepository(cfg *config.Config, logg *logger.Logger) (repository.Repository, error) {
+func initRepository(cfg *config.Config, logg *logger.Logger) (repository.Repository, error) {
 	if cfg.DBDSN != "" {
 		logg.Zap.Sugar().Info("using database storage")
 		return db.New(cfg.DBDSN)
