@@ -129,6 +129,21 @@ func (h *URLHandler) postShorten(w http.ResponseWriter, r *http.Request) {
 	shortURL, err := h.service.SaveShorten(req.URL)
 
 	if err != nil {
+		if errors.Is(err, repository.ErrConflict) {
+			resp := shortenResponse{
+				Result: shortURL,
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+
+			if err := json.NewEncoder(w).Encode(resp); err != nil {
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+			return
+		}
+
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
