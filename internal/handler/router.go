@@ -2,8 +2,10 @@ package handler
 
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -68,7 +70,13 @@ func (h *URLHandler) shortenURL(w http.ResponseWriter, r *http.Request) {
 
 	shortURL, err := h.service.SaveShorten(originalURL)
 	if err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		if errors.Is(err, repository.ErrConflict) {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(shortURL))
+			return
+		}
+		http.Error(w, "failed to save URL", http.StatusInternalServerError)
 		return
 	}
 

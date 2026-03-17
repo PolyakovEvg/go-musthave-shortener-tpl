@@ -3,9 +3,9 @@ package db
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/model"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/randstr"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -21,7 +21,6 @@ type DBRepository struct {
 }
 
 var table = "shorten_urls"
-var ErrConflict = errors.New("url already exists")
 
 func CheckConnection(dsn string) error {
 	if dsn == "" {
@@ -91,34 +90,33 @@ func runMigrations(db *sql.DB) error {
 func (r *DBRepository) Save(originalURL string) (string, error) {
 	log.Printf("Saving original URL: %s", originalURL)
 
-	var existingShort string
-	checkQuery := fmt.Sprintf(`SELECT short_url FROM %s WHERE original_url = $1`, table)
-
-	err := r.db.QueryRow(checkQuery, originalURL).Scan(&existingShort)
-	if err == nil {
-		log.Printf("URL already exists with short ID: %s", existingShort)
-		return existingShort, nil
-	} else if err != sql.ErrNoRows {
-		log.Printf("Error checking existing URL: %v", err)
-		return "", fmt.Errorf("failed to check existing URL: %w", err)
-	}
-
 	shortID, err := randstr.GenerateRandomStringURLSafe(8)
 	if err != nil {
-		log.Printf("Error generating short ID: %v", err)
 		return "", err
 	}
 
-	insertQuery := fmt.Sprintf(`INSERT INTO %s (short_url, original_url) VALUES ($1, $2)`, table)
+	query := fmt.Sprintf(`
+		INSERT INTO %s (short_url, original_url) 
+		VALUES ($1, $2) 
+		ON CONFLICT (original_url) DO NOTHING
+		RETURNING short_url`, table)
 
-	_, err = r.db.Exec(insertQuery, shortID, originalURL)
+	var returnedShort string
+	err = r.db.QueryRow(query, shortID, originalURL).Scan(&returnedShort)
+
 	if err != nil {
-		log.Printf("Error inserting into database: %v", err)
+		if err == sql.ErrNoRows {
+			selectQuery := fmt.Sprintf(`SELECT short_url FROM %s WHERE original_url = $1`, table)
+			err = r.db.QueryRow(selectQuery, originalURL).Scan(&returnedShort)
+			if err != nil {
+				return "", fmt.Errorf("failed to fetch existing URL: %w", err)
+			}
+			return returnedShort, repository.ErrConflict
+		}
 		return "", fmt.Errorf("failed to save URL: %w", err)
 	}
 
-	log.Printf("Successfully saved URL with short ID: %s", shortID)
-	return shortID, nil
+	return returnedShort, nil
 }
 
 func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {

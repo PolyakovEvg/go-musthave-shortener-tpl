@@ -25,6 +25,9 @@ func (s *URLService) SaveShorten(original string) (string, error) {
 
 	id, err := s.repo.Save(original)
 	if err != nil {
+		if errors.Is(err, repository.ErrConflict) {
+			return s.baseURL + id, err
+		}
 		return "", err
 	}
 
