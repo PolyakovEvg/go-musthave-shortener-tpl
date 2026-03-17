@@ -117,20 +117,14 @@ func (r *FileRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchRes
 
 	responses := make([]model.BatchResponse, 0, len(batch))
 	newRecords := make([]model.FileRecord, 0, len(batch))
+	urlToShort := make(map[string]string, len(r.data))
+
+	for _, rec := range r.data {
+		urlToShort[rec.OriginalURL] = rec.ShortURL
+	}
 
 	for _, req := range batch {
-		var existingShort string
-		var found bool
-
-		for _, rec := range r.data {
-			if rec.OriginalURL == req.OriginalURL {
-				existingShort = rec.ShortURL
-				found = true
-				break
-			}
-		}
-
-		if found {
+		if existingShort, exists := urlToShort[req.OriginalURL]; exists {
 			responses = append(responses, model.BatchResponse{
 				CorrelationID: req.CorrelationID,
 				ShortURL:      existingShort,
@@ -154,26 +148,22 @@ func (r *FileRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchRes
 		}
 
 		r.data[shortID] = rec
+		urlToShort[req.OriginalURL] = shortID
 		newRecords = append(newRecords, rec)
 
 		responses = append(responses, model.BatchResponse{
 			CorrelationID: req.CorrelationID,
 			ShortURL:      shortID,
 		})
-
-		log.Printf("Created record: UUID=%s, ShortURL=%s, OriginalURL=%s",
-			uuid, shortID, req.OriginalURL)
 	}
 
 	if len(newRecords) > 0 {
-		log.Printf("Flushing %d new records to file", len(newRecords))
 		if err := r.flush(); err != nil {
 			log.Printf("Error flushing data to file: %v", err)
 			return nil, err
 		}
 	}
 
-	log.Printf("Successfully saved batch of %d URLs", len(batch))
 	return responses, nil
 }
 

@@ -7,41 +7,34 @@ import (
 )
 
 type MemoryRepository struct {
-	data map[string]string
-	mu   sync.RWMutex
+	byShort map[string]string
+	byURL   map[string]string
+	mu      sync.RWMutex
 }
 
 func New() *MemoryRepository {
 	return &MemoryRepository{
-		data: make(map[string]string),
+		byShort: make(map[string]string),
+		byURL:   make(map[string]string),
 	}
 }
 
 func (mr *MemoryRepository) Save(url string) (string, error) {
-	mr.mu.RLock()
-	for short, existingURL := range mr.data {
-		if existingURL == url {
-			mr.mu.RUnlock()
-			return short, nil
-		}
+	mr.mu.Lock()
+	defer mr.mu.Unlock()
+
+	if short, exists := mr.byURL[url]; exists {
+		return short, nil
 	}
-	mr.mu.RUnlock()
 
 	shortID, err := randstr.GenerateRandomStringURLSafe(8)
 	if err != nil {
 		return "", err
 	}
 
-	mr.mu.Lock()
-	defer mr.mu.Unlock()
+	mr.byShort[shortID] = url
+	mr.byURL[url] = shortID
 
-	for short, existingURL := range mr.data {
-		if existingURL == url {
-			return short, nil
-		}
-	}
-
-	mr.data[shortID] = url
 	return shortID, nil
 }
 
@@ -49,7 +42,7 @@ func (mr *MemoryRepository) Get(id string) (string, bool) {
 	mr.mu.RLock()
 	defer mr.mu.RUnlock()
 
-	url, exists := mr.data[id]
+	url, exists := mr.byShort[id]
 	return url, exists
 }
 
@@ -60,19 +53,11 @@ func (mr *MemoryRepository) SaveBatch(batch []model.BatchRequest) ([]model.Batch
 	responses := make([]model.BatchResponse, 0, len(batch))
 
 	for _, req := range batch {
-		found := false
-		for short, existingURL := range mr.data {
-			if existingURL == req.OriginalURL {
-				responses = append(responses, model.BatchResponse{
-					CorrelationID: req.CorrelationID,
-					ShortURL:      short,
-				})
-				found = true
-				break
-			}
-		}
-
-		if found {
+		if short, exists := mr.byURL[req.OriginalURL]; exists {
+			responses = append(responses, model.BatchResponse{
+				CorrelationID: req.CorrelationID,
+				ShortURL:      short,
+			})
 			continue
 		}
 
@@ -81,7 +66,8 @@ func (mr *MemoryRepository) SaveBatch(batch []model.BatchRequest) ([]model.Batch
 			return nil, err
 		}
 
-		mr.data[shortID] = req.OriginalURL
+		mr.byShort[shortID] = req.OriginalURL
+		mr.byURL[req.OriginalURL] = shortID
 
 		responses = append(responses, model.BatchResponse{
 			CorrelationID: req.CorrelationID,
