@@ -18,7 +18,8 @@ func newTestRouter(cfg *config.Config) *chi.Mux {
 	r := chi.NewRouter()
 
 	svc := url.NewURLService(repo, cfg.BaseURL)
-	h := NewURLHandler(svc, cfg)
+
+	h := NewURLHandler(svc, cfg, nil)
 	h.Register(r)
 
 	return r
