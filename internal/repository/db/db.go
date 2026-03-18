@@ -113,7 +113,7 @@ func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchRespo
 
 		_, err = tx.Exec(insertBatchQuery, shortID, req.OriginalURL)
 		if err != nil {
-			return nil, fmt.Errorf("Error inserting into database: %w", err)
+			return nil, fmt.Errorf("error inserting into database: %w", err)
 		}
 
 		responses = append(responses, model.BatchResponse{
@@ -123,7 +123,7 @@ func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchRespo
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("Error committing transaction: %w", err)
+		return nil, fmt.Errorf("error committing transaction: %w", err)
 	}
 
 	return responses, nil

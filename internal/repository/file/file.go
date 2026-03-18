@@ -24,7 +24,7 @@ func New(filePath string) (*FileRepository, error) {
 	}
 
 	if err := repo.load(); err != nil {
-		return nil, fmt.Errorf("Error loading repository: %w", err)
+		return nil, fmt.Errorf("error loading repository: %w", err)
 	}
 
 	return repo, nil
@@ -48,7 +48,7 @@ func (r *FileRepository) load() error {
 
 	var records []model.FileRecord
 	if err := json.Unmarshal(fileBytes, &records); err != nil {
-		return fmt.Errorf("Error unmarshaling JSON from %s: %v", r.filePath, err)
+		return fmt.Errorf("error unmarshaling JSON from %s: %v", r.filePath, err)
 	}
 
 	for _, rec := range records {
@@ -73,7 +73,7 @@ func (r *FileRepository) Save(originalURL string) (string, error) {
 
 	shortID, err := randstr.GenerateRandomStringURLSafe(8)
 	if err != nil {
-		return "", fmt.Errorf("Error generating random string: %v", err)
+		return "", fmt.Errorf("error generating random string: %v", err)
 	}
 
 	r.counter++
@@ -88,7 +88,7 @@ func (r *FileRepository) Save(originalURL string) (string, error) {
 	r.data[shortID] = rec
 
 	if err := r.flush(); err != nil {
-		return "", fmt.Errorf("Error flushing data to file: %v", err)
+		return "", fmt.Errorf("error flushing data to file: %v", err)
 	}
 
 	return shortID, nil
@@ -117,7 +117,7 @@ func (r *FileRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchRes
 
 		shortID, err := randstr.GenerateRandomStringURLSafe(8)
 		if err != nil {
-			return nil, fmt.Errorf("Error generating random string: %v", err)
+			return nil, fmt.Errorf("error generating random string: %v", err)
 		}
 
 		r.counter++
@@ -169,13 +169,13 @@ func (r *FileRepository) flush() error {
 
 	data, err := json.MarshalIndent(records, "", "  ")
 	if err != nil {
-		return fmt.Errorf("Error marshaling records to JSON: %v", err)
+		return fmt.Errorf("error marshaling records to JSON: %v", err)
 	}
 
 	dir := filepath.Dir(r.filePath)
 	if dir != "." && dir != "" {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("Error creating directory %s: %v", dir, err)
+			return fmt.Errorf("error creating directory %s: %v", dir, err)
 		}
 	}
 
