@@ -10,6 +10,7 @@ import (
 func (h *URLHandler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		h.logger.Zap.Errorw("failed to read request body", "error", err)
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -17,17 +18,20 @@ func (h *URLHandler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 
 	var batch []model.BatchRequest
 	if err := json.Unmarshal(body, &batch); err != nil {
-		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		h.logger.Zap.Errorw("invalid JSON format", "error", err)
+		http.Error(w, "invalid JSON format", http.StatusBadRequest)
 		return
 	}
 
 	if len(batch) == 0 {
+		h.logger.Zap.Warnw("empty batch request")
 		http.Error(w, "empty batch", http.StatusBadRequest)
 		return
 	}
 
 	responses, err := h.service.SaveBatch(batch)
 	if err != nil {
+		h.logger.Zap.Errorw("failed to save batch", "error", err, "batch_size", len(batch))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -36,6 +40,7 @@ func (h *URLHandler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	if err := json.NewEncoder(w).Encode(responses); err != nil {
+		h.logger.Zap.Errorw("failed to encode batch response", "error", err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

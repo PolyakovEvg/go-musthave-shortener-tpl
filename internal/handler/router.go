@@ -2,12 +2,14 @@ package handler
 
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/logger"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -16,6 +18,7 @@ import (
 type URLHandler struct {
 	service *url.URLService
 	config  *config.Config
+	logger  *logger.Logger
 }
 type shortenRequest struct {
 	URL string `json:"url"`
@@ -40,10 +43,11 @@ func (h *URLHandler) Register(r chi.Router) {
 	})
 }
 
-func NewURLHandler(svc *url.URLService, cfg *config.Config) *URLHandler {
+func NewURLHandler(svc *url.URLService, cfg *config.Config, logg *logger.Logger) *URLHandler {
 	return &URLHandler{
 		service: svc,
 		config:  cfg,
+		logger:  logg,
 	}
 }
 
@@ -69,13 +73,26 @@ func (h *URLHandler) shortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortURL, err := h.service.SaveShorten(originalURL)
+
 	if err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusConflict)
 			w.Write([]byte(shortURL))
 			return
 		}
+
+		if errors.Is(err, os.ErrPermission) {
+			h.logger.Zap.Errorw("permission denied",
+				"file", h.config.FilePath,
+				"error", err,
+			)
+		}
+
+		h.logger.Zap.Errorw("failed to save shortened url",
+			"url", originalURL,
+			"error", err,
+		)
+
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

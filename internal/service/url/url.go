@@ -4,6 +4,7 @@ import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/model"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
 	"errors"
+	"fmt"
 )
 
 type URLService struct {
@@ -63,5 +64,8 @@ func (s *URLService) SaveBatch(batch []model.BatchRequest) ([]model.BatchRespons
 func (s *URLService) PingRepository() error {
 	err := s.repo.Ping()
 
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to ping repository: %w", err)
+	}
+	return nil
 }

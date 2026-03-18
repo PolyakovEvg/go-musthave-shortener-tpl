@@ -7,7 +7,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -62,8 +61,6 @@ func (r *DBRepository) Ping() error {
 }
 
 func (r *DBRepository) Save(originalURL string) (string, error) {
-	log.Printf("Saving original URL: %s", originalURL)
-
 	shortID, err := randstr.GenerateRandomStringURLSafe(8)
 	if err != nil {
 		return "", err
@@ -87,7 +84,6 @@ func (r *DBRepository) Save(originalURL string) (string, error) {
 }
 
 func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {
-	log.Printf("Saving batch of %d URLs", len(batch))
 
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -130,32 +126,27 @@ func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchRespo
 		return nil, fmt.Errorf("Error committing transaction: %w", err)
 	}
 
-	log.Printf("Successfully saved batch of %d URLs", len(batch))
 	return responses, nil
 }
 
 func (r *DBRepository) Get(shortURL string) (string, bool) {
-	log.Printf("Getting original URL for short URL: %s", shortURL)
 
 	var originalURL string
 	err := r.db.QueryRow(selectByShortQuery, shortURL).Scan(&originalURL)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			log.Printf("Short URL %s not found", shortURL)
 			return "", false
 		}
-		log.Printf("Error querying database: %v", err)
 		return "", false
 	}
 
-	log.Printf("Found original URL: %s for short URL: %s", originalURL, shortURL)
 	return originalURL, true
 }
 
 func runMigrations(db *sql.DB) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create migration driver: %w", err)
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
@@ -164,11 +155,11 @@ func runMigrations(db *sql.DB) error {
 		driver,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create migration: %w", err)
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return err
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	return nil

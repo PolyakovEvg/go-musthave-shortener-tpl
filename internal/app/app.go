@@ -34,7 +34,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	repo, err := initRepository(cfg, logg)
 	if err != nil {
-		logg.Zap.Sugar().Fatalf("can't initialize file repository %v", err)
+		logg.Zap.Fatalf("can't initialize file repository %v", err)
 	}
 
 	r := chi.NewRouter()
@@ -45,7 +45,7 @@ func New(cfg *config.Config) (*App, error) {
 	r.Use(middleware.Recoverer)
 
 	svc := url.NewURLService(repo, cfg.BaseURL)
-	handler := handler.NewURLHandler(svc, cfg)
+	handler := handler.NewURLHandler(svc, cfg, logg)
 	handler.Register(r)
 
 	server := &http.Server{
@@ -63,7 +63,7 @@ func New(cfg *config.Config) (*App, error) {
 func (a *App) Run() error {
 	defer a.logger.Zap.Sync()
 
-	a.logger.Zap.Sugar().Infow("starting server",
+	a.logger.Zap.Infow("starting server",
 		"addr", a.cfg.ServerAddress,
 		"url", a.cfg.BaseURL,
 	)
@@ -73,15 +73,15 @@ func (a *App) Run() error {
 
 func initRepository(cfg *config.Config, logg *logger.Logger) (repository.Repository, error) {
 	if cfg.DBDSN != "" {
-		logg.Zap.Sugar().Info("using database storage")
+		logg.Zap.Info("using database storage")
 		return db.New(cfg.DBDSN)
 	}
 
 	if cfg.FilePath != "" {
-		logg.Zap.Sugar().Info("using file storage")
+		logg.Zap.Info("using file storage")
 		return file.New(cfg.FilePath)
 	}
 
-	logg.Zap.Sugar().Info("using in-memory storage")
+	logg.Zap.Info("using in-memory storage")
 	return memory.New(), nil
 }
