@@ -1,15 +1,14 @@
 package handler
 
 import (
-	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/db"
 	"net/http"
 )
 
-func (h *URLHandler) ping(w http.ResponseWriter, r *http.Request) {
-	err := db.CheckConnection(h.config.DBDSN)
+func (h *URLHandler) PingHandler(w http.ResponseWriter, r *http.Request) {
+	err := h.service.PingRepository()
 
 	if err != nil {
-		http.Error(w, "cannot connect to the data base.", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 

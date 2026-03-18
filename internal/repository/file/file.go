@@ -78,6 +78,10 @@ func (r *FileRepository) load() error {
 	return nil
 }
 
+func (r *FileRepository) Ping() error {
+	return nil
+}
+
 func (r *FileRepository) Save(originalURL string) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

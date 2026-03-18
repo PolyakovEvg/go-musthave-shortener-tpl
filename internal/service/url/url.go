@@ -59,3 +59,9 @@ func (s *URLService) SaveBatch(batch []model.BatchRequest) ([]model.BatchRespons
 
 	return responses, nil
 }
+
+func (s *URLService) PingRepository() error {
+	err := s.repo.Ping()
+
+	return err
+}

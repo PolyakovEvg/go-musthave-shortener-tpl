@@ -19,6 +19,10 @@ func New() *MemoryRepository {
 	}
 }
 
+func (mem *MemoryRepository) Ping() error {
+	return nil
+}
+
 func (mr *MemoryRepository) Save(url string) (string, error) {
 	mr.mu.Lock()
 	defer mr.mu.Unlock()

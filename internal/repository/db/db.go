@@ -20,28 +20,20 @@ type DBRepository struct {
 	db *sql.DB
 }
 
-var table = "shorten_urls"
+const tableName = "shorten_urls"
 
-func CheckConnection(dsn string) error {
-	if dsn == "" {
-		return fmt.Errorf("data source name is empty")
-	}
+const (
+	insertQuery = `INSERT INTO shorten_urls (short_url, original_url) 
+                   VALUES ($1, $2) 
+                   ON CONFLICT (original_url) DO NOTHING
+                   RETURNING short_url`
 
-	db, err := sql.Open("pgx", dsn)
+	selectByOriginalQuery = `SELECT short_url FROM shorten_urls WHERE original_url = $1`
 
-	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
-	}
+	selectByShortQuery = `SELECT original_url FROM shorten_urls WHERE short_url = $1`
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return fmt.Errorf("failed to ping database: %w", err)
-	}
-	return nil
-}
+	insertBatchQuery = `INSERT INTO shorten_urls (short_url, original_url) VALUES ($1, $2)`
+)
 
 func New(dsn string) (*DBRepository, error) {
 	db, err := sql.Open("pgx", dsn)
@@ -65,6 +57,101 @@ func New(dsn string) (*DBRepository, error) {
 	return &DBRepository{db: db}, nil
 }
 
+func (r *DBRepository) Ping() error {
+	return r.db.Ping()
+}
+
+func (r *DBRepository) Save(originalURL string) (string, error) {
+	log.Printf("Saving original URL: %s", originalURL)
+
+	shortID, err := randstr.GenerateRandomStringURLSafe(8)
+	if err != nil {
+		return "", err
+	}
+
+	var returnedShort string
+	err = r.db.QueryRow(insertQuery, shortID, originalURL).Scan(&returnedShort)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			err = r.db.QueryRow(selectByOriginalQuery, originalURL).Scan(&returnedShort)
+			if err != nil {
+				return "", fmt.Errorf("failed to fetch existing URL: %w", err)
+			}
+			return returnedShort, repository.ErrConflict
+		}
+		return "", fmt.Errorf("failed to save URL: %w", err)
+	}
+
+	return returnedShort, nil
+}
+
+func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {
+	log.Printf("Saving batch of %d URLs", len(batch))
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	responses := make([]model.BatchResponse, 0, len(batch))
+
+	for _, req := range batch {
+		var existingShort string
+		err := tx.QueryRow(selectByOriginalQuery, req.OriginalURL).Scan(&existingShort)
+		if err == nil {
+			responses = append(responses, model.BatchResponse{
+				CorrelationID: req.CorrelationID,
+				ShortURL:      existingShort,
+			})
+			continue
+		} else if err != sql.ErrNoRows {
+			return nil, fmt.Errorf("failed to check existing URL: %w", err)
+		}
+
+		shortID, err := randstr.GenerateRandomStringURLSafe(8)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = tx.Exec(insertBatchQuery, shortID, req.OriginalURL)
+		if err != nil {
+			return nil, fmt.Errorf("Error inserting into database: %w", err)
+		}
+
+		responses = append(responses, model.BatchResponse{
+			CorrelationID: req.CorrelationID,
+			ShortURL:      shortID,
+		})
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("Error committing transaction: %w", err)
+	}
+
+	log.Printf("Successfully saved batch of %d URLs", len(batch))
+	return responses, nil
+}
+
+func (r *DBRepository) Get(shortURL string) (string, bool) {
+	log.Printf("Getting original URL for short URL: %s", shortURL)
+
+	var originalURL string
+	err := r.db.QueryRow(selectByShortQuery, shortURL).Scan(&originalURL)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("Short URL %s not found", shortURL)
+			return "", false
+		}
+		log.Printf("Error querying database: %v", err)
+		return "", false
+	}
+
+	log.Printf("Found original URL: %s for short URL: %s", originalURL, shortURL)
+	return originalURL, true
+}
+
 func runMigrations(db *sql.DB) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
@@ -85,111 +172,4 @@ func runMigrations(db *sql.DB) error {
 	}
 
 	return nil
-}
-
-func (r *DBRepository) Save(originalURL string) (string, error) {
-	log.Printf("Saving original URL: %s", originalURL)
-
-	shortID, err := randstr.GenerateRandomStringURLSafe(8)
-	if err != nil {
-		return "", err
-	}
-
-	query := fmt.Sprintf(`
-		INSERT INTO %s (short_url, original_url) 
-		VALUES ($1, $2) 
-		ON CONFLICT (original_url) DO NOTHING
-		RETURNING short_url`, table)
-
-	var returnedShort string
-	err = r.db.QueryRow(query, shortID, originalURL).Scan(&returnedShort)
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-			selectQuery := fmt.Sprintf(`SELECT short_url FROM %s WHERE original_url = $1`, table)
-			err = r.db.QueryRow(selectQuery, originalURL).Scan(&returnedShort)
-			if err != nil {
-				return "", fmt.Errorf("failed to fetch existing URL: %w", err)
-			}
-			return returnedShort, repository.ErrConflict
-		}
-		return "", fmt.Errorf("failed to save URL: %w", err)
-	}
-
-	return returnedShort, nil
-}
-
-func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {
-	log.Printf("Saving batch of %d URLs", len(batch))
-
-	tx, err := r.db.Begin()
-	if err != nil {
-		log.Printf("Error beginning transaction: %v", err)
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	responses := make([]model.BatchResponse, 0, len(batch))
-
-	for _, req := range batch {
-		var existingShort string
-		checkQuery := fmt.Sprintf(`SELECT short_url FROM %s WHERE original_url = $1`, table)
-
-		err := tx.QueryRow(checkQuery, req.OriginalURL).Scan(&existingShort)
-		if err == nil {
-			responses = append(responses, model.BatchResponse{
-				CorrelationID: req.CorrelationID,
-				ShortURL:      existingShort,
-			})
-			continue
-		} else if err != sql.ErrNoRows {
-			log.Printf("Error checking existing URL: %v", err)
-			return nil, fmt.Errorf("failed to check existing URL: %w", err)
-		}
-
-		shortID, err := randstr.GenerateRandomStringURLSafe(8)
-		if err != nil {
-			return nil, err
-		}
-		insertQuery := fmt.Sprintf(`INSERT INTO %s (short_url, original_url) VALUES ($1, $2)`, table)
-
-		_, err = tx.Exec(insertQuery, shortID, req.OriginalURL)
-		if err != nil {
-			log.Printf("Error inserting into database: %v", err)
-			return nil, fmt.Errorf("failed to save URL: %w", err)
-		}
-
-		responses = append(responses, model.BatchResponse{
-			CorrelationID: req.CorrelationID,
-			ShortURL:      shortID,
-		})
-	}
-
-	if err := tx.Commit(); err != nil {
-		log.Printf("Error committing transaction: %v", err)
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	log.Printf("Successfully saved batch of %d URLs", len(batch))
-	return responses, nil
-}
-
-func (r *DBRepository) Get(shortURL string) (string, bool) {
-	log.Printf("Getting original URL for short URL: %s", shortURL)
-
-	query := fmt.Sprintf(`SELECT original_url FROM %s WHERE short_url = $1`, table)
-
-	var originalURL string
-	err := r.db.QueryRow(query, shortURL).Scan(&originalURL)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			log.Printf("Short URL %s not found", shortURL)
-			return "", false
-		}
-		log.Printf("Error querying database: %v", err)
-		return "", false
-	}
-
-	log.Printf("Found original URL: %s for short URL: %s", originalURL, shortURL)
-	return originalURL, true
 }

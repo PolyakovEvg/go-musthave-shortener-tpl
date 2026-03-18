@@ -28,7 +28,7 @@ func (h *URLHandler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 
 	responses, err := h.service.SaveBatch(batch)
 	if err != nil {
-		http.Error(w, "failed to save URLs", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
@@ -36,7 +36,7 @@ func (h *URLHandler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	if err := json.NewEncoder(w).Encode(responses); err != nil {
-		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 }

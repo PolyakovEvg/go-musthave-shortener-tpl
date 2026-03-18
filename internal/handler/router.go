@@ -28,7 +28,7 @@ func (h *URLHandler) Register(r chi.Router) {
 	r.Post("/", h.shortenURL)
 	r.Get("/{id}", h.redirectURL)
 	r.Post("/{api}/{shorten}", h.postShorten)
-	r.Get("/ping", h.ping)
+	r.Get("/ping", h.PingHandler)
 	r.Post("/{api}/{shorten}/{batch}", h.ShortenBatch)
 
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +76,7 @@ func (h *URLHandler) shortenURL(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(shortURL))
 			return
 		}
-		http.Error(w, "failed to save URL", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
