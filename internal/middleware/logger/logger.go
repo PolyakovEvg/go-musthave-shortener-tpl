@@ -10,7 +10,7 @@ import (
 )
 
 type Logger struct {
-	Zap *zap.Logger
+	Zap *zap.SugaredLogger
 }
 
 type (
@@ -37,7 +37,7 @@ func NewLogger(lvl zapcore.Level) (*Logger, error) {
 		return nil, fmt.Errorf("failed cfg.Build: %v", err)
 	}
 
-	return &Logger{Zap: zl}, nil
+	return &Logger{Zap: zl.Sugar()}, nil
 }
 
 func (r *LoggingResponseWriter) Write(b []byte) (int, error) {
@@ -68,7 +68,7 @@ func (logger *Logger) WithLogging(h http.Handler) http.Handler {
 
 		duration := time.Since(start)
 
-		logger.Zap.Sugar().Infow(
+		logger.Zap.Infow(
 			"request",
 			"uri", r.RequestURI,
 			"method", r.Method,

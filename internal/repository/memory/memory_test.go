@@ -54,7 +54,7 @@ func TestRepository_Save(t *testing.T) {
 					t.Error("save() returned empty short ID")
 				}
 
-				savedURL, exists := repo.data[shortID]
+				savedURL, exists := repo.byShort[shortID]
 				if !exists {
 					t.Error("URL was not saved in memory storage")
 				}

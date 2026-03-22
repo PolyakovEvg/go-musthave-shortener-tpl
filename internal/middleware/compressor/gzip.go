@@ -3,7 +3,6 @@ package compressor
 import (
 	"compress/gzip"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 )
@@ -30,16 +29,14 @@ type gzipWriter struct {
 	http.ResponseWriter
 	writer          io.Writer
 	gz              *gzip.Writer
-	clientSupportGz bool // Добавляем флаг
+	clientSupportGz bool
 }
 
 func WithGzip(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 			reader, err := gzip.NewReader(r.Body)
-			if err != nil {
-				log.Println("decompress error:", err)
-			} else {
+			if err == nil {
 				defer reader.Close()
 				r.Body = reader
 			}
