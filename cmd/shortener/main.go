@@ -12,10 +12,11 @@ func main() {
 	serverAddr := flag.String("a", ":8080", "Server address")
 	baseURL := flag.String("b", "http://localhost:8080", "Base URL")
 	fpath := flag.String("f", "data/storage.json", "File Path")
+	authSecret := flag.String("s", "test_auth_secret", "Auth secret")
 
 	flag.Parse()
 
-	cfg := config.NewConfig(*serverAddr, *baseURL, *fpath)
+	cfg := config.NewConfig(*serverAddr, *baseURL, *fpath, *authSecret)
 
 	a, err := app.New(cfg)
 
