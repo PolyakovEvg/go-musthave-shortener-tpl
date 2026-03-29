@@ -2,6 +2,7 @@ package handler
 
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
+	authmw "PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/logger"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
@@ -72,7 +73,14 @@ func (h *URLHandler) shortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.service.SaveShorten(originalURL)
+	userID, ok := authmw.UserIDFromContext(r.Context())
+
+	if !ok {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	shortURL, err := h.service.SaveShorten(userID, originalURL)
 
 	if err != nil {
 		if errors.Is(err, repository.ErrConflict) {
@@ -143,7 +151,14 @@ func (h *URLHandler) postShorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.service.SaveShorten(req.URL)
+	userID, ok := authmw.UserIDFromContext(r.Context())
+
+	if !ok {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	shortURL, err := h.service.SaveShorten(userID, req.URL)
 
 	if err != nil {
 		if errors.Is(err, repository.ErrConflict) {

@@ -22,16 +22,18 @@ type DBRepository struct {
 const tableName = "shorten_urls"
 
 const (
-	insertQuery = `INSERT INTO shorten_urls (short_url, original_url) 
-                   VALUES ($1, $2) 
-                   ON CONFLICT (original_url) DO NOTHING
-                   RETURNING short_url`
+	insertQuery = `INSERT INTO shorten_urls (short_url, original_url, user_id)
+	VALUES ($1, $2, $3)
+	ON CONFLICT (original_url) DO NOTHING
+	RETURNING short_url`
 
 	selectByOriginalQuery = `SELECT short_url FROM shorten_urls WHERE original_url = $1`
 
 	selectByShortQuery = `SELECT original_url FROM shorten_urls WHERE short_url = $1`
 
-	insertBatchQuery = `INSERT INTO shorten_urls (short_url, original_url) VALUES ($1, $2)`
+	selectByUserQuery = `SELECT short_url, original_url FROM shorten_urls WHERE user_id = $1`
+
+	insertBatchQuery = `INSERT INTO shorten_urls (short_url, original_url, user_id) VALUES ($1, $2, $3)`
 )
 
 func New(dsn string) (*DBRepository, error) {
@@ -60,14 +62,14 @@ func (r *DBRepository) Ping() error {
 	return r.db.Ping()
 }
 
-func (r *DBRepository) Save(originalURL string) (string, error) {
+func (r *DBRepository) Save(userID, originalURL string) (string, error) {
 	shortID, err := randstr.GenerateRandomStringURLSafe(8)
 	if err != nil {
 		return "", err
 	}
 
 	var returnedShort string
-	err = r.db.QueryRow(insertQuery, shortID, originalURL).Scan(&returnedShort)
+	err = r.db.QueryRow(insertQuery, shortID, originalURL, userID).Scan(&returnedShort)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -83,7 +85,7 @@ func (r *DBRepository) Save(originalURL string) (string, error) {
 	return returnedShort, nil
 }
 
-func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {
+func (r *DBRepository) SaveBatch(userID string, batch []model.BatchRequest) ([]model.BatchResponse, error) {
 
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -141,6 +143,29 @@ func (r *DBRepository) Get(shortURL string) (string, bool) {
 	}
 
 	return originalURL, true
+}
+
+func (r *DBRepository) GetByUser(userID string) ([]model.URL, error) {
+	rows, err := r.db.Query(selectByUserQuery, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []model.URL
+
+	for rows.Next() {
+		var u model.URL
+		u.UserID = userID
+
+		if err := rows.Scan(&u.ShortURL, &u.OriginalURL); err != nil {
+			return nil, err
+		}
+
+		result = append(result, u)
+	}
+
+	return result, nil
 }
 
 func runMigrations(db *sql.DB) error {

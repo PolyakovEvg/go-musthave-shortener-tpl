@@ -67,7 +67,7 @@ func (r *FileRepository) Ping() error {
 	return nil
 }
 
-func (r *FileRepository) Save(originalURL string) (string, error) {
+func (r *FileRepository) Save(userID, originalURL string) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -81,6 +81,7 @@ func (r *FileRepository) Save(originalURL string) (string, error) {
 
 	rec := model.FileRecord{
 		UUID:        uuid,
+		UserID:      userID,
 		ShortURL:    shortID,
 		OriginalURL: originalURL,
 	}
@@ -94,7 +95,7 @@ func (r *FileRepository) Save(originalURL string) (string, error) {
 	return shortID, nil
 }
 
-func (r *FileRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {
+func (r *FileRepository) SaveBatch(userID string, batch []model.BatchRequest) ([]model.BatchResponse, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -125,6 +126,7 @@ func (r *FileRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchRes
 
 		rec := model.FileRecord{
 			UUID:        uuid,
+			UserID:      userID,
 			ShortURL:    shortID,
 			OriginalURL: req.OriginalURL,
 		}
@@ -158,6 +160,25 @@ func (r *FileRepository) Get(shortURL string) (string, bool) {
 	}
 
 	return rec.OriginalURL, true
+}
+
+func (r *FileRepository) GetByUser(userID string) ([]model.URL, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	result := make([]model.URL, 0)
+
+	for _, rec := range r.data {
+		if rec.UserID == userID {
+			result = append(result, model.URL{
+				ShortURL:    rec.ShortURL,
+				OriginalURL: rec.OriginalURL,
+				UserID:      rec.UserID,
+			})
+		}
+	}
+
+	return result, nil
 }
 
 func (r *FileRepository) flush() error {

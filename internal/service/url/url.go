@@ -19,12 +19,12 @@ func NewURLService(repo repository.Repository, baseURL string) *URLService {
 	}
 }
 
-func (s *URLService) SaveShorten(original string) (string, error) {
+func (s *URLService) SaveShorten(userID, original string) (string, error) {
 	if original == "" {
 		return "", errors.New("url is empty")
 	}
 
-	id, err := s.repo.Save(original)
+	id, err := s.repo.Save(userID, original)
 	if err != nil {
 		if errors.Is(err, repository.ErrConflict) {
 			return s.baseURL + id, err
@@ -44,12 +44,12 @@ func (s *URLService) GetOriginal(id string) (string, error) {
 	return url, nil
 }
 
-func (s *URLService) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {
+func (s *URLService) SaveBatch(userID string, batch []model.BatchRequest) ([]model.BatchResponse, error) {
 	if len(batch) == 0 {
 		return nil, errors.New("empty batch")
 	}
 
-	responses, err := s.repo.SaveBatch(batch)
+	responses, err := s.repo.SaveBatch(userID, batch)
 	if err != nil {
 		return nil, err
 	}
@@ -59,6 +59,23 @@ func (s *URLService) SaveBatch(batch []model.BatchRequest) ([]model.BatchRespons
 	}
 
 	return responses, nil
+}
+
+func (s *URLService) GetUserURLs(userID string) ([]model.URL, error) {
+	if userID == "" {
+		return nil, errors.New("empty user id")
+	}
+
+	urls, err := s.repo.GetByUser(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range urls {
+		urls[i].ShortURL = s.baseURL + urls[i].ShortURL
+	}
+
+	return urls, nil
 }
 
 func (s *URLService) PingRepository() error {
