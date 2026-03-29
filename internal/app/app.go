@@ -14,6 +14,7 @@ import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/db"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/file"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
+	service "PolyakovEvg/go-musthave-shortener-tpl/internal/service/deleter"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 
 	"github.com/go-chi/chi/v5"
@@ -22,9 +23,10 @@ import (
 )
 
 type App struct {
-	cfg    *config.Config
-	server *http.Server
-	logger *logger.Logger
+	cfg     *config.Config
+	server  *http.Server
+	logger  *logger.Logger
+	Deleter *service.Deleter
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -39,6 +41,8 @@ func New(cfg *config.Config) (*App, error) {
 
 		logg.Zap.Fatalf("can't initialize file repository %v", err)
 	}
+
+	deleter := service.NewDeleter(repo.MarkDeleted, logg)
 
 	authManager, err := auth.New(auth.Config{
 		Secret:   cfg.AuthSecret,
@@ -57,7 +61,7 @@ func New(cfg *config.Config) (*App, error) {
 	r.Use(middleware.Recoverer)
 
 	svc := url.NewURLService(repo, cfg.BaseURL)
-	handler := handler.NewURLHandler(svc, cfg, logg)
+	handler := handler.NewURLHandler(svc, deleter, cfg, logg)
 	handler.Register(r)
 
 	server := &http.Server{
@@ -66,9 +70,10 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	return &App{
-		cfg:    cfg,
-		server: server,
-		logger: logg,
+		cfg:     cfg,
+		server:  server,
+		logger:  logg,
+		Deleter: deleter,
 	}, nil
 }
 

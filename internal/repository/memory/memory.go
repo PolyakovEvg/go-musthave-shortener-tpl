@@ -47,16 +47,16 @@ func (mr *MemoryRepository) Save(userID, original string) (string, error) {
 	return shortID, nil
 }
 
-func (mr *MemoryRepository) Get(id string) (string, bool) {
+func (mr *MemoryRepository) Get(shortURL string) (*model.URL, bool) {
 	mr.mu.RLock()
 	defer mr.mu.RUnlock()
 
-	url, exists := mr.data[id]
+	rec, exists := mr.data[shortURL]
 	if !exists {
-		return "", false
+		return nil, false
 	}
 
-	return url.OriginalURL, true
+	return &rec, true
 }
 
 func (mr *MemoryRepository) SaveBatch(userID string, batch []model.BatchRequest) ([]model.BatchResponse, error) {
@@ -109,4 +109,22 @@ func (mr *MemoryRepository) GetByUser(userID string) ([]model.URL, error) {
 	}
 
 	return result, nil
+}
+
+func (mr *MemoryRepository) MarkDeleted(userID string, shorts []string) error {
+	mr.mu.Lock()
+	defer mr.mu.Unlock()
+
+	for _, short := range shorts {
+		rec, ok := mr.data[short]
+		if !ok {
+			continue
+		}
+		if rec.UserID != userID {
+			continue
+		}
+		rec.IsDeleted = true
+		mr.data[short] = rec
+	}
+	return nil
 }

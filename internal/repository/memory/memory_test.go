@@ -119,14 +119,19 @@ func TestRepository_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			url, ok := repo.Get(tt.id)
+			rec, ok := repo.Get(tt.id)
 
 			if ok != tt.wantOk {
 				t.Errorf("Get() ok = %v, want %v", ok, tt.wantOk)
 			}
 
-			if url != tt.wantURL {
-				t.Errorf("Get() url = %v, want %v", url, tt.wantURL)
+			gotURL := ""
+			if ok && rec != nil {
+				gotURL = rec.OriginalURL
+			}
+
+			if gotURL != tt.wantURL {
+				t.Errorf("Get() url = %v, want %v", gotURL, tt.wantURL)
 			}
 		})
 	}

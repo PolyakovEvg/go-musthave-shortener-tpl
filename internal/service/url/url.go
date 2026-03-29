@@ -35,13 +35,13 @@ func (s *URLService) SaveShorten(userID, original string) (string, error) {
 	return s.baseURL + id, nil
 }
 
-func (s *URLService) GetOriginal(id string) (string, error) {
-	url, ok := s.repo.Get(id)
+func (s *URLService) GetOriginal(id string) (*model.URL, error) {
+	rec, ok := s.repo.Get(id)
 
 	if !ok {
-		return "", errors.New("not found original URL")
+		return nil, errors.New("not found original URL")
 	}
-	return url, nil
+	return rec, nil
 }
 
 func (s *URLService) SaveBatch(userID string, batch []model.BatchRequest) ([]model.BatchResponse, error) {

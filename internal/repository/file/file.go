@@ -150,16 +150,21 @@ func (r *FileRepository) SaveBatch(userID string, batch []model.BatchRequest) ([
 	return responses, nil
 }
 
-func (r *FileRepository) Get(shortURL string) (string, bool) {
+func (r *FileRepository) Get(shortURL string) (*model.URL, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	rec, ok := r.data[shortURL]
 	if !ok {
-		return "", false
+		return nil, false
 	}
 
-	return rec.OriginalURL, true
+	return &model.URL{
+		ShortURL:    rec.ShortURL,
+		OriginalURL: rec.OriginalURL,
+		UserID:      rec.UserID,
+		IsDeleted:   rec.IsDeleted,
+	}, true
 }
 
 func (r *FileRepository) GetByUser(userID string) ([]model.URL, error) {
@@ -179,6 +184,38 @@ func (r *FileRepository) GetByUser(userID string) ([]model.URL, error) {
 	}
 
 	return result, nil
+}
+
+func (r *FileRepository) MarkDeleted(userID string, shorts []string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	changed := false
+
+	for _, s := range shorts {
+		rec, ok := r.data[s]
+		if !ok {
+			continue
+		}
+
+		if rec.UserID != userID {
+			continue
+		}
+
+		if !rec.IsDeleted {
+			rec.IsDeleted = true
+			r.data[s] = rec
+			changed = true
+		}
+	}
+
+	if changed {
+		if err := r.flush(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *FileRepository) flush() error {

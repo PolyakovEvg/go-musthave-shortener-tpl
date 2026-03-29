@@ -38,6 +38,8 @@ func main() {
 		log.Fatalf("app init failed: %v", err)
 	}
 
+	defer a.Deleter.Close()
+
 	if err := a.Run(); err != nil {
 		log.Fatalf("app run failed: %v", err)
 	}
