@@ -32,8 +32,9 @@ func (h *URLHandler) Register(r chi.Router) {
 	r.Post("/", h.shortenURL)
 	r.Get("/{id}", h.redirectURL)
 	r.Post("/{api}/{shorten}", h.postShorten)
-	r.Get("/ping", h.PingHandler)
-	r.Post("/{api}/{shorten}/{batch}", h.ShortenBatch)
+	r.Get("/ping", h.pingHandler)
+	r.Post("/{api}/{shorten}/{batch}", h.shortenBatch)
+	r.Post("/{user}/{urls}", h.getUserURLs)
 
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)

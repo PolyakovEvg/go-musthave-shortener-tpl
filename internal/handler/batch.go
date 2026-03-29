@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func (h *URLHandler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
+func (h *URLHandler) shortenBatch(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.logger.Zap.Errorw("failed to read request body", "error", err)

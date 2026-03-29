@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-func (h *URLHandler) PingHandler(w http.ResponseWriter, r *http.Request) {
+func (h *URLHandler) pingHandler(w http.ResponseWriter, r *http.Request) {
 	err := h.service.PingRepository()
 
 	if err != nil {
