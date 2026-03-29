@@ -86,7 +86,6 @@ func (r *DBRepository) Save(userID, originalURL string) (string, error) {
 }
 
 func (r *DBRepository) SaveBatch(userID string, batch []model.BatchRequest) ([]model.BatchResponse, error) {
-
 	tx, err := r.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -113,7 +112,7 @@ func (r *DBRepository) SaveBatch(userID string, batch []model.BatchRequest) ([]m
 			return nil, err
 		}
 
-		_, err = tx.Exec(insertBatchQuery, shortID, req.OriginalURL)
+		_, err = tx.Exec(insertBatchQuery, shortID, req.OriginalURL, userID)
 		if err != nil {
 			return nil, fmt.Errorf("error inserting into database: %w", err)
 		}
@@ -130,7 +129,6 @@ func (r *DBRepository) SaveBatch(userID string, batch []model.BatchRequest) ([]m
 
 	return responses, nil
 }
-
 func (r *DBRepository) Get(shortURL string) (string, bool) {
 
 	var originalURL string
