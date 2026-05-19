@@ -2,9 +2,12 @@ package service
 
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/logger"
+	"errors"
 	"sync"
 	"time"
 )
+
+var ErrQueueFull = errors.New("delete queue is full")
 
 type DeleteTask struct {
 	UserID string
@@ -37,8 +40,13 @@ func NewDeleter(markFunc func(userID string, shorts []string) error, logger *log
 	return d
 }
 
-func (d *Deleter) Enqueue(task DeleteTask) {
-	d.fanIn <- task
+func (d *Deleter) Enqueue(task DeleteTask) error {
+	select {
+	case d.fanIn <- task:
+		return nil
+	default:
+		return ErrQueueFull
+	}
 }
 
 func (d *Deleter) batchWorker() {

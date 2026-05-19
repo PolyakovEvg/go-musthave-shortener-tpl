@@ -20,11 +20,20 @@ func (h *URLHandler) deleteUserURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, id := range ids {
-		h.deleter.Enqueue(service.DeleteTask{
-			UserID: userID,
-			IDs:    []string{id},
-		})
+	task := service.DeleteTask{
+		UserID: userID,
+		IDs:    ids,
+	}
+
+	if err := h.deleter.Enqueue(task); err != nil {
+		h.logger.Zap.Warnw("failed to enqueue delete task",
+			"userID", userID,
+			"ids_count", len(ids),
+			"error", err,
+		)
+
+		http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+		return
 	}
 
 	w.WriteHeader(http.StatusAccepted)

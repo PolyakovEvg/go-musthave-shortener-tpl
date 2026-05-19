@@ -62,7 +62,7 @@ func NewConfig(params Config) *Config {
 	if ok {
 		cfg.AuthSecret = envAuthSecret
 	} else if params.AuthSecret != "" {
-		cfg.AuthSecret = envAuthSecret
+		cfg.AuthSecret = params.AuthSecret
 	}
 
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/") + "/"

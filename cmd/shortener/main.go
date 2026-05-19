@@ -15,7 +15,7 @@ func main() {
 	baseURL := flag.String("b", "http://localhost:8080", "Base URL")
 	fpath := flag.String("f", "data/storage.json", "File Path")
 	dbDSN := flag.String("d", "", "DB Data Source Name")
-	authSecret := flag.String("s", "test_auth_secret", "Auth secret")
+	authSecret := flag.String("s", "", "Auth secret")
 
 	flag.Parse()
 
