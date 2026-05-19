@@ -37,7 +37,7 @@ func (h *URLHandler) shortenBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responses, err := h.service.SaveBatch(userID, batch)
+	responses, err := h.urlService.SaveBatch(userID, batch)
 	if err != nil {
 		h.logger.Zap.Errorw("failed to save batch", "error", err, "batch_size", len(batch))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

@@ -14,6 +14,7 @@ import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/db"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/file"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/audit"
 	service "PolyakovEvg/go-musthave-shortener-tpl/internal/service/deleter"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 
@@ -60,8 +61,11 @@ func New(cfg *config.Config) (*App, error) {
 	r.Use(logg.WithLogging)
 	r.Use(middleware.Recoverer)
 
-	svc := url.NewURLService(repo, cfg.BaseURL)
-	handler := handler.NewURLHandler(svc, deleter, cfg, logg)
+	urlService := url.NewURLService(repo, cfg.BaseURL)
+	auditService := audit.NewAuditService(logg)
+	initObservers(cfg, logg, auditService)
+
+	handler := handler.NewURLHandler(urlService, auditService, deleter, cfg, logg)
 	handler.Register(r)
 
 	server := &http.Server{
@@ -101,4 +105,20 @@ func initRepository(cfg *config.Config, logg *logger.Logger) (repository.Reposit
 
 	logg.Zap.Info("using in-memory storage")
 	return memory.New(), nil
+}
+
+func initObservers(cfg *config.Config, logg *logger.Logger, auditService *audit.AuditService) {
+	fileObserver, err := audit.NewFileObserver(cfg.AuditFile)
+	if err != nil {
+		logg.Zap.Infow("File observer error", "error", err)
+	} else {
+		auditService.Register(fileObserver)
+	}
+
+	httpObserver, err := audit.NewHTTPObserver(cfg.AuditURL)
+	if err != nil {
+		logg.Zap.Infow("HTTP observer error", "error", err)
+	} else {
+		auditService.Register(httpObserver)
+	}
 }

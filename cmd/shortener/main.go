@@ -16,6 +16,8 @@ func main() {
 	fpath := flag.String("f", "data/storage.json", "File Path")
 	dbDSN := flag.String("d", "", "DB Data Source Name")
 	authSecret := flag.String("s", "", "Auth secret")
+	auditFile := flag.String("audit-file", "", "Audit file path")
+	auditURL := flag.String("audit-url", "", "Audit remote URL")
 
 	flag.Parse()
 
@@ -30,6 +32,8 @@ func main() {
 		FilePath:      *fpath,
 		DBDSN:         *dbDSN,
 		AuthSecret:    *authSecret,
+		AuditFile:     *auditFile,
+		AuditURL:      *auditURL,
 	})
 
 	a, err := app.New(cfg)

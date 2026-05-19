@@ -5,7 +5,7 @@ import (
 )
 
 func (h *URLHandler) pingHandler(w http.ResponseWriter, r *http.Request) {
-	err := h.service.PingRepository()
+	err := h.urlService.PingRepository()
 
 	if err != nil {
 		h.logger.Zap.Errorw("Ping failed", "error", err)

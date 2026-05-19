@@ -11,6 +11,8 @@ type Config struct {
 	FilePath      string
 	DBDSN         string
 	AuthSecret    string
+	AuditFile     string
+	AuditURL      string
 }
 
 const (
@@ -19,6 +21,8 @@ const (
 	EnvFilePath      string = "FILE_STORAGE_PATH"
 	EnvDB            string = "DATABASE_DSN"
 	EnvAuthSecret    string = "AUTH_SECRET"
+	EnvAuditFile     string = "AUDIT_FILE"
+	EnvAuditURL      string = "AUDIT_URL"
 )
 
 func NewConfig(params Config) *Config {
@@ -63,6 +67,20 @@ func NewConfig(params Config) *Config {
 		cfg.AuthSecret = envAuthSecret
 	} else if params.AuthSecret != "" {
 		cfg.AuthSecret = params.AuthSecret
+	}
+
+	envAuditFile, ok := os.LookupEnv(EnvAuditFile)
+	if ok {
+		cfg.AuditFile = envAuditFile
+	} else if params.AuditFile != "" {
+		cfg.AuditFile = params.AuditFile
+	}
+
+	envAuditURL, ok := os.LookupEnv(EnvAuditURL)
+	if ok {
+		cfg.AuditURL = envAuditURL
+	} else if params.AuditURL != "" {
+		cfg.AuditURL = params.AuditURL
 	}
 
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/") + "/"

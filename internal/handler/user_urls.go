@@ -13,7 +13,7 @@ func (h *URLHandler) getUserURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	urls, err := h.service.GetUserURLs(userID)
+	urls, err := h.urlService.GetUserURLs(userID)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
