@@ -5,6 +5,7 @@ import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
 	authmw "PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/audit"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 	"encoding/json"
 	"net/http"
@@ -18,9 +19,10 @@ import (
 
 func newTestRouter(cfg *config.Config) *chi.Mux {
 	repo := memory.New()
-	svc := url.NewURLService(repo, cfg.BaseURL)
+	urlService := url.NewURLService(repo, cfg.BaseURL)
+	auditService := audit.NewAuditService(nil)
 
-	h := NewURLHandler(svc, nil, nil, cfg, nil)
+	h := NewURLHandler(urlService, auditService, nil, cfg, nil)
 
 	r := chi.NewRouter()
 
