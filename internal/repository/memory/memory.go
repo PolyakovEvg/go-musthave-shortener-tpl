@@ -7,27 +7,27 @@ import (
 )
 
 type MemoryRepository struct {
-	byShort map[string]string
-	byURL   map[string]string
-	mu      sync.RWMutex
+	data  map[string]model.URL
+	byURL map[string]string
+	mu    sync.RWMutex
 }
 
 func New() *MemoryRepository {
 	return &MemoryRepository{
-		byShort: make(map[string]string),
-		byURL:   make(map[string]string),
+		data:  make(map[string]model.URL),
+		byURL: make(map[string]string),
 	}
 }
 
-func (mem *MemoryRepository) Ping() error {
+func (mr *MemoryRepository) Ping() error {
 	return nil
 }
 
-func (mr *MemoryRepository) Save(url string) (string, error) {
+func (mr *MemoryRepository) Save(userID, original string) (string, error) {
 	mr.mu.Lock()
 	defer mr.mu.Unlock()
 
-	if short, exists := mr.byURL[url]; exists {
+	if short, exists := mr.byURL[original]; exists {
 		return short, nil
 	}
 
@@ -36,21 +36,30 @@ func (mr *MemoryRepository) Save(url string) (string, error) {
 		return "", err
 	}
 
-	mr.byShort[shortID] = url
-	mr.byURL[url] = shortID
+	mr.data[shortID] = model.URL{
+		ShortURL:    shortID,
+		OriginalURL: original,
+		UserID:      userID,
+	}
+
+	mr.byURL[original] = shortID
 
 	return shortID, nil
 }
 
-func (mr *MemoryRepository) Get(id string) (string, bool) {
+func (mr *MemoryRepository) Get(shortURL string) (*model.URL, bool) {
 	mr.mu.RLock()
 	defer mr.mu.RUnlock()
 
-	url, exists := mr.byShort[id]
-	return url, exists
+	rec, exists := mr.data[shortURL]
+	if !exists {
+		return nil, false
+	}
+
+	return &rec, true
 }
 
-func (mr *MemoryRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {
+func (mr *MemoryRepository) SaveBatch(userID string, batch []model.BatchRequest) ([]model.BatchResponse, error) {
 	mr.mu.Lock()
 	defer mr.mu.Unlock()
 
@@ -70,7 +79,12 @@ func (mr *MemoryRepository) SaveBatch(batch []model.BatchRequest) ([]model.Batch
 			return nil, err
 		}
 
-		mr.byShort[shortID] = req.OriginalURL
+		mr.data[shortID] = model.URL{
+			ShortURL:    shortID,
+			OriginalURL: req.OriginalURL,
+			UserID:      userID,
+		}
+
 		mr.byURL[req.OriginalURL] = shortID
 
 		responses = append(responses, model.BatchResponse{
@@ -80,4 +94,37 @@ func (mr *MemoryRepository) SaveBatch(batch []model.BatchRequest) ([]model.Batch
 	}
 
 	return responses, nil
+}
+
+func (mr *MemoryRepository) GetByUser(userID string) ([]model.URL, error) {
+	mr.mu.RLock()
+	defer mr.mu.RUnlock()
+
+	result := make([]model.URL, 0)
+
+	for _, u := range mr.data {
+		if u.UserID == userID {
+			result = append(result, u)
+		}
+	}
+
+	return result, nil
+}
+
+func (mr *MemoryRepository) MarkDeleted(userID string, shorts []string) error {
+	mr.mu.Lock()
+	defer mr.mu.Unlock()
+
+	for _, short := range shorts {
+		rec, ok := mr.data[short]
+		if !ok {
+			continue
+		}
+		if rec.UserID != userID {
+			continue
+		}
+		rec.IsDeleted = true
+		mr.data[short] = rec
+	}
+	return nil
 }

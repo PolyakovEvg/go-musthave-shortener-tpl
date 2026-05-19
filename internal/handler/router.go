@@ -2,8 +2,10 @@ package handler
 
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
+	authmw "PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/logger"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
+	service "PolyakovEvg/go-musthave-shortener-tpl/internal/service/deleter"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 	"encoding/json"
 	"errors"
@@ -19,6 +21,7 @@ type URLHandler struct {
 	service *url.URLService
 	config  *config.Config
 	logger  *logger.Logger
+	deleter *service.Deleter
 }
 type shortenRequest struct {
 	URL string `json:"url"`
@@ -31,8 +34,10 @@ func (h *URLHandler) Register(r chi.Router) {
 	r.Post("/", h.shortenURL)
 	r.Get("/{id}", h.redirectURL)
 	r.Post("/{api}/{shorten}", h.postShorten)
-	r.Get("/ping", h.PingHandler)
-	r.Post("/{api}/{shorten}/{batch}", h.ShortenBatch)
+	r.Get("/ping", h.pingHandler)
+	r.Post("/{api}/{shorten}/{batch}", h.shortenBatch)
+	r.Get("/{api}/{user}/{urls}", h.getUserURLs)
+	r.Delete("/{api}/{user}/{urls}", h.deleteUserURLs)
 
 	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -43,9 +48,10 @@ func (h *URLHandler) Register(r chi.Router) {
 	})
 }
 
-func NewURLHandler(svc *url.URLService, cfg *config.Config, logg *logger.Logger) *URLHandler {
+func NewURLHandler(svc *url.URLService, deleter *service.Deleter, cfg *config.Config, logg *logger.Logger) *URLHandler {
 	return &URLHandler{
 		service: svc,
+		deleter: deleter,
 		config:  cfg,
 		logger:  logg,
 	}
@@ -72,7 +78,14 @@ func (h *URLHandler) shortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.service.SaveShorten(originalURL)
+	userID, ok := authmw.UserIDFromContext(r.Context())
+
+	if !ok {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	shortURL, err := h.service.SaveShorten(userID, originalURL)
 
 	if err != nil {
 		if errors.Is(err, repository.ErrConflict) {
@@ -106,14 +119,19 @@ func (h *URLHandler) redirectURL(w http.ResponseWriter, r *http.Request) {
 	shortID := chi.URLParam(r, "id")
 
 	shortID = strings.TrimPrefix(shortID, "/")
-	originalURL, err := h.service.GetOriginal(shortID)
+	rec, err := h.service.GetOriginal(shortID)
 
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
 
-	http.Redirect(w, r, originalURL, http.StatusTemporaryRedirect)
+	if rec.IsDeleted {
+		http.Error(w, http.StatusText(http.StatusGone), http.StatusGone)
+		return
+	}
+
+	http.Redirect(w, r, rec.OriginalURL, http.StatusTemporaryRedirect)
 }
 
 func (h *URLHandler) postShorten(w http.ResponseWriter, r *http.Request) {
@@ -143,7 +161,14 @@ func (h *URLHandler) postShorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.service.SaveShorten(req.URL)
+	userID, ok := authmw.UserIDFromContext(r.Context())
+
+	if !ok {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	shortURL, err := h.service.SaveShorten(userID, req.URL)
 
 	if err != nil {
 		if errors.Is(err, repository.ErrConflict) {

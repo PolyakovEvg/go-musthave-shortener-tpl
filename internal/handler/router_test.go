@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
+	authmw "PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 	"encoding/json"
@@ -9,19 +11,23 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
 
 func newTestRouter(cfg *config.Config) *chi.Mux {
 	repo := memory.New()
-	r := chi.NewRouter()
-
 	svc := url.NewURLService(repo, cfg.BaseURL)
 
-	h := NewURLHandler(svc, cfg, nil)
-	h.Register(r)
+	h := NewURLHandler(svc, nil, cfg, nil)
 
+	r := chi.NewRouter()
+
+	authMgr, _ := auth.New(auth.Config{Secret: "testsecret", TokenTTL: 24 * time.Hour})
+	r.Use(authmw.WithCookie(authMgr))
+
+	h.Register(r)
 	return r
 }
 

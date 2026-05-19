@@ -1,13 +1,14 @@
 package handler
 
 import (
+	authmw "PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/model"
 	"encoding/json"
 	"io"
 	"net/http"
 )
 
-func (h *URLHandler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
+func (h *URLHandler) shortenBatch(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.logger.Zap.Errorw("failed to read request body", "error", err)
@@ -29,7 +30,14 @@ func (h *URLHandler) ShortenBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responses, err := h.service.SaveBatch(batch)
+	userID, ok := authmw.UserIDFromContext(r.Context())
+
+	if !ok {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	responses, err := h.service.SaveBatch(userID, batch)
 	if err != nil {
 		h.logger.Zap.Errorw("failed to save batch", "error", err, "batch_size", len(batch))
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

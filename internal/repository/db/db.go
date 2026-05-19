@@ -19,21 +19,6 @@ type DBRepository struct {
 	db *sql.DB
 }
 
-const tableName = "shorten_urls"
-
-const (
-	insertQuery = `INSERT INTO shorten_urls (short_url, original_url) 
-                   VALUES ($1, $2) 
-                   ON CONFLICT (original_url) DO NOTHING
-                   RETURNING short_url`
-
-	selectByOriginalQuery = `SELECT short_url FROM shorten_urls WHERE original_url = $1`
-
-	selectByShortQuery = `SELECT original_url FROM shorten_urls WHERE short_url = $1`
-
-	insertBatchQuery = `INSERT INTO shorten_urls (short_url, original_url) VALUES ($1, $2)`
-)
-
 func New(dsn string) (*DBRepository, error) {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
@@ -60,18 +45,24 @@ func (r *DBRepository) Ping() error {
 	return r.db.Ping()
 }
 
-func (r *DBRepository) Save(originalURL string) (string, error) {
+func (r *DBRepository) Save(userID, originalURL string) (string, error) {
 	shortID, err := randstr.GenerateRandomStringURLSafe(8)
 	if err != nil {
 		return "", err
 	}
 
 	var returnedShort string
-	err = r.db.QueryRow(insertQuery, shortID, originalURL).Scan(&returnedShort)
+	query := `
+	INSERT INTO shorten_urls (short_url, original_url, user_id)
+	VALUES ($1, $2, $3)
+	ON CONFLICT (original_url) DO NOTHING
+	RETURNING short_url`
 
+	err = r.db.QueryRow(query, shortID, originalURL, userID).Scan(&returnedShort)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			err = r.db.QueryRow(selectByOriginalQuery, originalURL).Scan(&returnedShort)
+			selectQuery := `SELECT short_url FROM shorten_urls WHERE original_url = $1`
+			err = r.db.QueryRow(selectQuery, originalURL).Scan(&returnedShort)
 			if err != nil {
 				return "", fmt.Errorf("failed to fetch existing URL: %w", err)
 			}
@@ -83,8 +74,7 @@ func (r *DBRepository) Save(originalURL string) (string, error) {
 	return returnedShort, nil
 }
 
-func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchResponse, error) {
-
+func (r *DBRepository) SaveBatch(userID string, batch []model.BatchRequest) ([]model.BatchResponse, error) {
 	tx, err := r.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -95,7 +85,8 @@ func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchRespo
 
 	for _, req := range batch {
 		var existingShort string
-		err := tx.QueryRow(selectByOriginalQuery, req.OriginalURL).Scan(&existingShort)
+		selectQuery := `SELECT short_url FROM shorten_urls WHERE original_url = $1`
+		err := tx.QueryRow(selectQuery, req.OriginalURL).Scan(&existingShort)
 		if err == nil {
 			responses = append(responses, model.BatchResponse{
 				CorrelationID: req.CorrelationID,
@@ -111,7 +102,8 @@ func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchRespo
 			return nil, err
 		}
 
-		_, err = tx.Exec(insertBatchQuery, shortID, req.OriginalURL)
+		insertQuery := `INSERT INTO shorten_urls (short_url, original_url, user_id) VALUES ($1, $2, $3)`
+		_, err = tx.Exec(insertQuery, shortID, req.OriginalURL, userID)
 		if err != nil {
 			return nil, fmt.Errorf("error inserting into database: %w", err)
 		}
@@ -129,18 +121,46 @@ func (r *DBRepository) SaveBatch(batch []model.BatchRequest) ([]model.BatchRespo
 	return responses, nil
 }
 
-func (r *DBRepository) Get(shortURL string) (string, bool) {
-
-	var originalURL string
-	err := r.db.QueryRow(selectByShortQuery, shortURL).Scan(&originalURL)
+func (r *DBRepository) Get(shortURL string) (*model.URL, bool) {
+	var rec model.URL
+	query := `SELECT short_url, original_url, user_id, is_deleted FROM shorten_urls WHERE short_url=$1`
+	err := r.db.QueryRow(query, shortURL).Scan(&rec.ShortURL, &rec.OriginalURL, &rec.UserID, &rec.IsDeleted)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return "", false
-		}
-		return "", false
+		return nil, false
 	}
 
-	return originalURL, true
+	return &rec, true
+}
+
+func (r *DBRepository) GetByUser(userID string) ([]model.URL, error) {
+	query := `SELECT short_url, original_url FROM shorten_urls WHERE user_id = $1`
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []model.URL
+	for rows.Next() {
+		var u model.URL
+		u.UserID = userID
+		if err := rows.Scan(&u.ShortURL, &u.OriginalURL); err != nil {
+			return nil, err
+		}
+		result = append(result, u)
+	}
+
+	return result, nil
+}
+
+func (r *DBRepository) MarkDeleted(userID string, shorts []string) error {
+	if len(shorts) == 0 {
+		return nil
+	}
+
+	query := `UPDATE shorten_urls SET is_deleted = TRUE WHERE user_id = $1 AND short_url = ANY($2)`
+	_, err := r.db.Exec(query, userID, shorts)
+	return err
 }
 
 func runMigrations(db *sql.DB) error {

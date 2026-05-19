@@ -15,6 +15,7 @@ func main() {
 	baseURL := flag.String("b", "http://localhost:8080", "Base URL")
 	fpath := flag.String("f", "data/storage.json", "File Path")
 	dbDSN := flag.String("d", "", "DB Data Source Name")
+	authSecret := flag.String("s", "", "Auth secret")
 
 	flag.Parse()
 
@@ -28,6 +29,7 @@ func main() {
 		BaseURL:       *baseURL,
 		FilePath:      *fpath,
 		DBDSN:         *dbDSN,
+		AuthSecret:    *authSecret,
 	})
 
 	a, err := app.New(cfg)
@@ -35,6 +37,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("app init failed: %v", err)
 	}
+
+	defer a.Deleter.Close()
 
 	if err := a.Run(); err != nil {
 		log.Fatalf("app run failed: %v", err)

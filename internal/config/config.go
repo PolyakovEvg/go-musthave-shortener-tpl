@@ -10,6 +10,7 @@ type Config struct {
 	BaseURL       string
 	FilePath      string
 	DBDSN         string
+	AuthSecret    string
 }
 
 const (
@@ -17,6 +18,7 @@ const (
 	EnvBaseURL       string = "BASE_URL"
 	EnvFilePath      string = "FILE_STORAGE_PATH"
 	EnvDB            string = "DATABASE_DSN"
+	EnvAuthSecret    string = "AUTH_SECRET"
 )
 
 func NewConfig(params Config) *Config {
@@ -25,6 +27,7 @@ func NewConfig(params Config) *Config {
 		BaseURL:       "http://localhost:8080/",
 		FilePath:      "data/storage.json",
 		DBDSN:         "",
+		AuthSecret:    "",
 	}
 
 	envAddr, ok := os.LookupEnv(EnvServerAddress)
@@ -53,6 +56,13 @@ func NewConfig(params Config) *Config {
 		cfg.DBDSN = envDB
 	} else if params.DBDSN != "" {
 		cfg.DBDSN = params.DBDSN
+	}
+
+	envAuthSecret, ok := os.LookupEnv(EnvAuthSecret)
+	if ok {
+		cfg.AuthSecret = envAuthSecret
+	} else if params.AuthSecret != "" {
+		cfg.AuthSecret = params.AuthSecret
 	}
 
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/") + "/"
