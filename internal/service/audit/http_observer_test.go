@@ -85,7 +85,6 @@ func TestHTTPObserver_Send_Success(t *testing.T) {
 			t.Errorf("Failed to decode request body: %v", err)
 		}
 
-		// Отвечаем успешно
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -221,7 +220,6 @@ func TestHTTPObserver_Send_RequestData(t *testing.T) {
 		t.Errorf("Send() error: %v", err)
 	}
 
-	// Даём время серверу обработать запрос
 	time.Sleep(100 * time.Millisecond)
 
 	if receivedEvent.Ts != expectedEvent.Ts {

@@ -58,7 +58,6 @@ func TestNewFileObserver(t *testing.T) {
 				t.Errorf("NewFileObserver() file is nil")
 			}
 
-			// Проверяем, что файл существует
 			if _, err := os.Stat(tt.filePath); os.IsNotExist(err) {
 				t.Errorf("file %s was not created", tt.filePath)
 			}

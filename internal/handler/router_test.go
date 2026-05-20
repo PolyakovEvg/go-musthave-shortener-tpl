@@ -207,6 +207,21 @@ func TestRouter_MultipleURLs(t *testing.T) {
 	}
 }
 
+func TestAPI_Ping(t *testing.T) {
+	cfg := &config.Config{
+		BaseURL: "http://localhost:8080/",
+	}
+	mux := newTestRouter(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+}
+
 func TestAPI_ShortenURL(t *testing.T) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080/",
