@@ -1,6 +1,8 @@
 package memory
 
 import (
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/model"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -134,5 +136,55 @@ func TestRepository_Get(t *testing.T) {
 				t.Errorf("Get() url = %v, want %v", gotURL, tt.wantURL)
 			}
 		})
+	}
+}
+
+// Benchmarks
+
+func BenchmarkRepository_Save(b *testing.B) {
+	repo := New()
+	url := "https://example.com/very/long/path/with/many/segments/and/query/parameters?foo=bar&baz=qux"
+
+	b.ReportAllocs()
+	for i := 0; b.Loop(); i++ {
+		_, _ = repo.Save(userID, url)
+	}
+}
+
+func BenchmarkRepository_Get(b *testing.B) {
+	repo := New()
+	shortID, _ := repo.Save(userID, "https://example.com")
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = repo.Get(shortID)
+	}
+}
+
+func BenchmarkRepository_SaveBatch(b *testing.B) {
+	batch := make([]model.BatchRequest, 100)
+	for i := range batch {
+		batch[i] = model.BatchRequest{
+			CorrelationID: "corr-" + strconv.Itoa(i),
+			OriginalURL:   "https://example.com/page" + strconv.Itoa(i),
+		}
+	}
+
+	b.ReportAllocs()
+	for i := 0; b.Loop(); i++ {
+		repo := New()
+		_, _ = repo.SaveBatch(userID, batch)
+	}
+}
+
+func BenchmarkRepository_GetByUser(b *testing.B) {
+	repo := New()
+	for i := 0; i < 100; i++ {
+		_, _ = repo.Save(userID, "https://example.com/page"+strconv.Itoa(i))
+	}
+
+	b.ReportAllocs()
+	for i := 0; b.Loop(); i++ {
+		_, _ = repo.GetByUser(userID)
 	}
 }
