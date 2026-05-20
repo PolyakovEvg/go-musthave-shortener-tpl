@@ -7,15 +7,17 @@ import (
 )
 
 type MemoryRepository struct {
-	data  map[string]model.URL
-	byURL map[string]string
-	mu    sync.RWMutex
+	data   map[string]model.URL
+	byURL  map[string]string
+	byUser map[string][]string
+	mu     sync.RWMutex
 }
 
 func New() *MemoryRepository {
 	return &MemoryRepository{
-		data:  make(map[string]model.URL),
-		byURL: make(map[string]string),
+		data:   make(map[string]model.URL),
+		byURL:  make(map[string]string),
+		byUser: make(map[string][]string),
 	}
 }
 
@@ -43,6 +45,7 @@ func (mr *MemoryRepository) Save(userID, original string) (string, error) {
 	}
 
 	mr.byURL[original] = shortID
+	mr.byUser[userID] = append(mr.byUser[userID], shortID)
 
 	return shortID, nil
 }
@@ -86,6 +89,7 @@ func (mr *MemoryRepository) SaveBatch(userID string, batch []model.BatchRequest)
 		}
 
 		mr.byURL[req.OriginalURL] = shortID
+		mr.byUser[userID] = append(mr.byUser[userID], shortID)
 
 		responses = append(responses, model.BatchResponse{
 			CorrelationID: req.CorrelationID,
@@ -100,11 +104,16 @@ func (mr *MemoryRepository) GetByUser(userID string) ([]model.URL, error) {
 	mr.mu.RLock()
 	defer mr.mu.RUnlock()
 
-	result := make([]model.URL, 0)
+	shortIDs, exists := mr.byUser[userID]
+	if !exists {
+		return nil, nil
+	}
 
-	for _, u := range mr.data {
-		if u.UserID == userID {
-			result = append(result, u)
+	result := make([]model.URL, 0, len(shortIDs))
+
+	for _, shortID := range shortIDs {
+		if rec, ok := mr.data[shortID]; ok {
+			result = append(result, rec)
 		}
 	}
 
