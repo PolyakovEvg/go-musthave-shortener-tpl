@@ -1,3 +1,4 @@
+// Package handler предоставляет HTTP-хендлеры для сервиса сокращения URL.
 package handler
 
 import (
@@ -18,6 +19,8 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// URLHandler обрабатывает HTTP-запросы для сокращения URL.
+// Содержит зависимости для работы с сервисами URL, аудита и удаления.
 type URLHandler struct {
 	urlService   *url.URLService
 	auditService *audit.AuditService
@@ -25,13 +28,26 @@ type URLHandler struct {
 	logger       *logger.Logger
 	deleter      *service.Deleter
 }
+
+// shortenRequest — запрос на сокращение URL в формате JSON.
 type shortenRequest struct {
 	URL string `json:"url"`
 }
+
+// shortenResponse — ответ с сокращённым URL.
 type shortenResponse struct {
 	Result string `json:"result"`
 }
 
+// Register регистрирует все маршруты хендлера на маршрутизаторе.
+// Маршруты:
+//   - POST / — сокращение URL (text/plain)
+//   - GET /{id} — редирект на оригинальный URL
+//   - POST /api/shorten — сокращение URL (JSON)
+//   - GET /ping — проверка соединения с БД
+//   - POST /api/shorten/batch — пакетное сокращение URL
+//   - GET /api/user/urls — получение URL пользователя
+//   - DELETE /api/user/urls — удаление URL пользователя
 func (h *URLHandler) Register(r chi.Router) {
 	r.Post("/", h.shortenURL)
 	r.Get("/{id}", h.redirectURL)
@@ -50,6 +66,7 @@ func (h *URLHandler) Register(r chi.Router) {
 	})
 }
 
+// NewURLHandler создаёт новый экземпляр URLHandler с указанными зависимостями.
 func NewURLHandler(
 	urlService *url.URLService,
 	auditService *audit.AuditService,

@@ -5,11 +5,14 @@ import (
 	"fmt"
 )
 
+// AuditService управляет отправкой событий аудита наблюдателям.
+// Поддерживает регистрацию нескольких наблюдателей и асинхронную отправку событий.
 type AuditService struct {
 	logger    *logger.Logger
 	observers []Observer
 }
 
+// NewAuditService создаёт новый сервис аудита с указанным логгером.
 func NewAuditService(logger *logger.Logger) *AuditService {
 	return &AuditService{
 		logger:    logger,
@@ -17,6 +20,7 @@ func NewAuditService(logger *logger.Logger) *AuditService {
 	}
 }
 
+// Register добавляет наблюдателя для получения событий аудита.
 func (s *AuditService) Register(observer Observer) {
 	s.observers = append(s.observers, observer)
 	s.logger.Zap.Infow("Registered observer",
@@ -24,6 +28,8 @@ func (s *AuditService) Register(observer Observer) {
 	)
 }
 
+// Notify отправляет событие аудита всем зарегистрированным наблюдателям.
+// Отправка происходит асинхронно в отдельных горутинах.
 func (s *AuditService) Notify(event AuditEvent) {
 	for _, observer := range s.observers {
 		go func(obs Observer) {

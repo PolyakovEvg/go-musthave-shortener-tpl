@@ -1,3 +1,5 @@
+// Package config предоставляет конфигурацию для сервиса сокращения URL.
+// Поддерживает загрузку параметров из переменных окружения и флагов командной строки.
 package config
 
 import (
@@ -5,26 +7,44 @@ import (
 	"strings"
 )
 
+// Config содержит параметры конфигурации сервиса.
 type Config struct {
+	// ServerAddress — адрес сервера в формате host:port (например, ":8080").
 	ServerAddress string
-	BaseURL       string
-	FilePath      string
-	DBDSN         string
-	AuthSecret    string
-	AuditFile     string
-	AuditURL      string
+	// BaseURL — базовый URL для сокращённых ссылок (например, "http://localhost:8080/").
+	BaseURL string
+	// FilePath — путь к файлу для хранения данных (для файлового хранилища).
+	FilePath string
+	// DBDSN — строка подключения к базе данных (для DB хранилища).
+	DBDSN string
+	// AuthSecret — секретный ключ для подписи JWT токенов.
+	AuthSecret string
+	// AuditFile — путь к файлу для записи событий аудита.
+	AuditFile string
+	// AuditURL — URL для отправки событий аудита по HTTP.
+	AuditURL string
 }
 
+// Константы для имён переменных окружения.
 const (
+	// EnvServerAddress — переменная окружения для адреса сервера.
 	EnvServerAddress string = "SERVER_ADDRESS"
-	EnvBaseURL       string = "BASE_URL"
-	EnvFilePath      string = "FILE_STORAGE_PATH"
-	EnvDB            string = "DATABASE_DSN"
-	EnvAuthSecret    string = "AUTH_SECRET"
-	EnvAuditFile     string = "AUDIT_FILE"
-	EnvAuditURL      string = "AUDIT_URL"
+	// EnvBaseURL — переменная окружения для базового URL.
+	EnvBaseURL string = "BASE_URL"
+	// EnvFilePath — переменная окружения для пути к файлу хранилища.
+	EnvFilePath string = "FILE_STORAGE_PATH"
+	// EnvDB — переменная окружения для строки подключения к БД.
+	EnvDB string = "DATABASE_DSN"
+	// EnvAuthSecret — переменная окружения для секретного ключа.
+	EnvAuthSecret string = "AUTH_SECRET"
+	// EnvAuditFile — переменная окружения для файла аудита.
+	EnvAuditFile string = "AUDIT_FILE"
+	// EnvAuditURL — переменная окружения для URL аудита.
+	EnvAuditURL string = "AUDIT_URL"
 )
 
+// NewConfig создаёт новую конфигурацию с значениями по умолчанию.
+// Приоритет: переменные окружения > переданные параметры > значения по умолчанию.
 func NewConfig(params Config) *Config {
 	cfg := &Config{
 		ServerAddress: ":8080",

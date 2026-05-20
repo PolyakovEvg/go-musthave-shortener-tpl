@@ -1,3 +1,5 @@
+// Package auth предоставляет аутентификацию пользователей через JWT токены в cookies.
+// Используется для идентификации пользователей сервиса сокращения URL.
 package auth
 
 import (
@@ -9,20 +11,31 @@ import (
 	"github.com/google/uuid"
 )
 
+// Ошибки аутентификации.
 var (
+	// ErrInvalidToken возвращается при невалидном или просроченном токене.
 	ErrInvalidToken = errors.New("invalid token")
-	ErrNoCookie     = errors.New("cookie not found")
+	// ErrNoCookie возвращается, когда cookie с токеном не найден.
+	ErrNoCookie = errors.New("cookie not found")
 )
 
+// Config содержит параметры конфигурации менеджера аутентификации.
 type Config struct {
-	Secret       string
-	TokenTTL     time.Duration
-	CookieName   string
+	// Secret — секретный ключ для подписи JWT токенов.
+	Secret string
+	// TokenTTL — время жизни токена.
+	TokenTTL time.Duration
+	// CookieName — имя cookie для хранения токена.
+	CookieName string
+	// CookieMaxAge — максимальное время жизни cookie в секундах.
 	CookieMaxAge int
-	HTTPOnly     bool
-	Secure       bool
+	// HTTPOnly — флаг, запрещающий доступ к cookie из JavaScript.
+	HTTPOnly bool
+	// Secure — флаг, разрешающий передачу cookie только по HTTPS.
+	Secure bool
 }
 
+// Manager управляет JWT токенами и cookies для аутентификации пользователей.
 type Manager struct {
 	secret       []byte
 	tokenTTL     time.Duration
@@ -32,11 +45,15 @@ type Manager struct {
 	secure       bool
 }
 
+// Claims представляет claims JWT токена с идентификатором пользователя.
 type Claims struct {
+	// UserID — уникальный идентификатор пользователя.
 	UserID string `json:"sub"`
 	jwt.RegisteredClaims
 }
 
+// New создаёт новый менеджер аутентификации.
+// Если некоторые параметры не указаны, используются значения по умолчанию.
 func New(cfg Config) (*Manager, error) {
 	if cfg.Secret == "" {
 		return nil, errors.New("auth secret cannot be empty")
@@ -62,6 +79,8 @@ func New(cfg Config) (*Manager, error) {
 	}, nil
 }
 
+// GenerateToken генерирует JWT токен для указанного пользователя.
+// Возвращает подписанный токен или ошибку.
 func (m *Manager) GenerateToken(userID string) (string, error) {
 	now := time.Now()
 
@@ -78,6 +97,8 @@ func (m *Manager) GenerateToken(userID string) (string, error) {
 	return token.SignedString(m.secret)
 }
 
+// ParseToken парсит JWT токен и возвращает идентификатор пользователя.
+// Возвращает ErrInvalidToken, если токен невалиден или просрочен.
 func (m *Manager) ParseToken(tokenStr string) (string, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if t.Method != jwt.SigningMethodHS256 {
@@ -102,6 +123,8 @@ func (m *Manager) ParseToken(tokenStr string) (string, error) {
 	return claims.UserID, nil
 }
 
+// SetCookie устанавливает cookie с JWT токеном для указанного пользователя.
+// Токен автоматически генерируется и подписывается.
 func (m *Manager) SetCookie(w http.ResponseWriter, userID string) error {
 	token, err := m.GenerateToken(userID)
 	if err != nil {
@@ -122,6 +145,8 @@ func (m *Manager) SetCookie(w http.ResponseWriter, userID string) error {
 	return nil
 }
 
+// GetUserID извлекает идентификатор пользователя из cookie в запросе.
+// Возвращает ErrNoCookie, если cookie не найден, или ErrInvalidToken, если токен невалиден.
 func (m *Manager) GetUserID(r *http.Request) (string, error) {
 	cookie, err := r.Cookie(m.cookieName)
 	if err != nil {
@@ -131,6 +156,8 @@ func (m *Manager) GetUserID(r *http.Request) (string, error) {
 	return m.ParseToken(cookie.Value)
 }
 
+// GetOrCreateUserID возвращает идентификатор пользователя из cookie или создаёт нового.
+// Если cookie отсутствует или токен невалиден, генерируется новый UUID и устанавливается cookie.
 func (m *Manager) GetOrCreateUserID(w http.ResponseWriter, r *http.Request) (string, error) {
 	userID, err := m.GetUserID(r)
 	if err == nil {

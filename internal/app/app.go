@@ -1,3 +1,5 @@
+// Package app предоставляет основное приложение сервиса сокращения URL.
+// Инициализирует все зависимости и запускает HTTP-сервер.
 package app
 
 import (
@@ -23,13 +25,18 @@ import (
 	"go.uber.org/zap"
 )
 
+// App представляет основное приложение сервиса.
+// Содержит конфигурацию, HTTP-сервер, логгер и сервис удаления URL.
 type App struct {
-	cfg     *config.Config
-	server  *http.Server
-	logger  *logger.Logger
+	cfg    *config.Config
+	server *http.Server
+	logger *logger.Logger
+	// Deleter — сервис асинхронного удаления URL.
 	Deleter *service.Deleter
 }
 
+// New создаёт новое приложение с указанной конфигурацией.
+// Инициализирует хранилище, сервисы, middleware и HTTP-обработчики.
 func New(cfg *config.Config) (*App, error) {
 	logg, err := logger.NewLogger(zap.InfoLevel)
 	if err != nil {
@@ -81,6 +88,8 @@ func New(cfg *config.Config) (*App, error) {
 	}, nil
 }
 
+// Run запускает HTTP-сервер и блокирует выполнение до остановки сервера.
+// При завершении синхронизирует логи.
 func (a *App) Run() error {
 	defer a.logger.Zap.Sync()
 
