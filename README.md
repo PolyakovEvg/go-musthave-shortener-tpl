@@ -42,3 +42,18 @@ git fetch template && git checkout template/v2 .github
 - **Clean Architecture**
 - **Hexagonal Architecture**
 - **Layered Architecture**
+
+## Оптимизация производительности
+
+С помощью профилировщика pprof был выявлен участок кода с избыточными аллокациями — метод `GetByUser` в `MemoryRepository`. Метод перебирал все записи в карте для поиска URL пользователя, что приводило к лишним выделениям памяти.
+
+После рефакторинга: добавлен индекс `byUser` для прямого доступа к URL по userID, память уменьшилась в 2.6 раза (с 16208 до 6144 B/op), аллокации сократились в 8 раз (с 8 до 1 allocs/op).
+
+**Сравнение профилей:**
+```
+go tool pprof -top -diff_base=profiles/base.pprof profiles/result.pprof
+
+   -4.44GB  GetByUser
+```
+
+что подтверждает уменьшение использования памяти.

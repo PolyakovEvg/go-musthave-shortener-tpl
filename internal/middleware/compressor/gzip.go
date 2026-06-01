@@ -1,3 +1,5 @@
+// Package compressor предоставляет middleware для сжатия HTTP-ответов.
+// Поддерживает gzip-сжатие для клиентов, поддерживающих Accept-Encoding: gzip.
 package compressor
 
 import (
@@ -7,11 +9,13 @@ import (
 	"strings"
 )
 
+// allowedContentTypes — список Content-Type, для которых применяется сжатие.
 var allowedContentTypes = []string{
 	"application/json",
 	"text/html",
 }
 
+// shouldCompress проверяет, нужно ли сжимать ответ с указанным Content-Type.
 func shouldCompress(ct string) bool {
 	if ct == "" {
 		return false
@@ -25,6 +29,7 @@ func shouldCompress(ct string) bool {
 	return false
 }
 
+// gzipWriter — обёртка над http.ResponseWriter с поддержкой gzip-сжатия.
 type gzipWriter struct {
 	http.ResponseWriter
 	writer          io.Writer
@@ -32,6 +37,7 @@ type gzipWriter struct {
 	clientSupportGz bool
 }
 
+// WithGzip возвращает middleware для gzip-сжатия ответов и распаковки запросов.
 func WithGzip(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {

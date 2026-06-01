@@ -5,6 +5,7 @@ import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
 	authmw "PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/audit"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 	"encoding/json"
 	"net/http"
@@ -18,9 +19,10 @@ import (
 
 func newTestRouter(cfg *config.Config) *chi.Mux {
 	repo := memory.New()
-	svc := url.NewURLService(repo, cfg.BaseURL)
+	urlService := url.NewURLService(repo, cfg.BaseURL)
+	auditService := audit.NewAuditService(nil)
 
-	h := NewURLHandler(svc, nil, cfg, nil)
+	h := NewURLHandler(urlService, auditService, nil, cfg, nil)
 
 	r := chi.NewRouter()
 
@@ -202,6 +204,21 @@ func TestRouter_MultipleURLs(t *testing.T) {
 		if location != urls[i] {
 			t.Errorf("expected %q, got %q", urls[i], location)
 		}
+	}
+}
+
+func TestAPI_Ping(t *testing.T) {
+	cfg := &config.Config{
+		BaseURL: "http://localhost:8080/",
+	}
+	mux := newTestRouter(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, rr.Code)
 	}
 }
 

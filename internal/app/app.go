@@ -1,3 +1,5 @@
+// Package app предоставляет основное приложение сервиса сокращения URL.
+// Инициализирует все зависимости и запускает HTTP-сервер.
 package app
 
 import (
@@ -14,6 +16,7 @@ import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/db"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/file"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/audit"
 	service "PolyakovEvg/go-musthave-shortener-tpl/internal/service/deleter"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 
@@ -22,13 +25,18 @@ import (
 	"go.uber.org/zap"
 )
 
+// App представляет основное приложение сервиса.
+// Содержит конфигурацию, HTTP-сервер, логгер и сервис удаления URL.
 type App struct {
-	cfg     *config.Config
-	server  *http.Server
-	logger  *logger.Logger
+	cfg    *config.Config
+	server *http.Server
+	logger *logger.Logger
+	// Deleter — сервис асинхронного удаления URL.
 	Deleter *service.Deleter
 }
 
+// New создаёт новое приложение с указанной конфигурацией.
+// Инициализирует хранилище, сервисы, middleware и HTTP-обработчики.
 func New(cfg *config.Config) (*App, error) {
 	logg, err := logger.NewLogger(zap.InfoLevel)
 	if err != nil {
@@ -60,8 +68,11 @@ func New(cfg *config.Config) (*App, error) {
 	r.Use(logg.WithLogging)
 	r.Use(middleware.Recoverer)
 
-	svc := url.NewURLService(repo, cfg.BaseURL)
-	handler := handler.NewURLHandler(svc, deleter, cfg, logg)
+	urlService := url.NewURLService(repo, cfg.BaseURL)
+	auditService := audit.NewAuditService(logg)
+	initObservers(cfg, logg, auditService)
+
+	handler := handler.NewURLHandler(urlService, auditService, deleter, cfg, logg)
 	handler.Register(r)
 
 	server := &http.Server{
@@ -77,6 +88,8 @@ func New(cfg *config.Config) (*App, error) {
 	}, nil
 }
 
+// Run запускает HTTP-сервер и блокирует выполнение до остановки сервера.
+// При завершении синхронизирует логи.
 func (a *App) Run() error {
 	defer a.logger.Zap.Sync()
 
@@ -101,4 +114,20 @@ func initRepository(cfg *config.Config, logg *logger.Logger) (repository.Reposit
 
 	logg.Zap.Info("using in-memory storage")
 	return memory.New(), nil
+}
+
+func initObservers(cfg *config.Config, logg *logger.Logger, auditService *audit.AuditService) {
+	fileObserver, err := audit.NewFileObserver(cfg.AuditFile)
+	if err != nil {
+		logg.Zap.Infow("File observer error", "error", err)
+	} else {
+		auditService.Register(fileObserver)
+	}
+
+	httpObserver, err := audit.NewHTTPObserver(cfg.AuditURL)
+	if err != nil {
+		logg.Zap.Infow("HTTP observer error", "error", err)
+	} else {
+		auditService.Register(httpObserver)
+	}
 }

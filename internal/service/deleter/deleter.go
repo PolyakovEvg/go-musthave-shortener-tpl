@@ -1,3 +1,5 @@
+// Package service предоставляет сервис асинхронного удаления URL.
+// Использует паттерн fan-in для batching запросов на удаление.
 package service
 
 import (
@@ -7,13 +9,19 @@ import (
 	"time"
 )
 
+// ErrQueueFull возвращается, когда очередь удаления переполнена.
 var ErrQueueFull = errors.New("delete queue is full")
 
+// DeleteTask представляет задачу на удаление URL.
 type DeleteTask struct {
+	// UserID — идентификатор пользователя, удаляющего URL.
 	UserID string
-	IDs    []string
+	// IDs — список коротких идентификаторов для удаления.
+	IDs []string
 }
 
+// Deleter предоставляет асинхронное удаление URL с batching.
+// Накапливает задачи и отправляет их батчами в хранилище.
 type Deleter struct {
 	logger       *logger.Logger
 	markFunc     func(userID string, shorts []string) error
@@ -25,6 +33,8 @@ type Deleter struct {
 	wg   sync.WaitGroup
 }
 
+// NewDeleter создаёт новый сервис удаления.
+// markFunc — функция пометки URL как удалённые в хранилище.
 func NewDeleter(markFunc func(userID string, shorts []string) error, logger *logger.Logger) *Deleter {
 	d := &Deleter{
 		logger:       logger,
@@ -40,6 +50,8 @@ func NewDeleter(markFunc func(userID string, shorts []string) error, logger *log
 	return d
 }
 
+// Enqueue добавляет задачу на удаление в очередь.
+// Возвращает ErrQueueFull, если очередь переполнена.
 func (d *Deleter) Enqueue(task DeleteTask) error {
 	select {
 	case d.fanIn <- task:
@@ -107,6 +119,7 @@ func (d *Deleter) batchWorker() {
 	}
 }
 
+// Close останавливает сервис удаления и ожидает завершения всех задач.
 func (d *Deleter) Close() {
 	close(d.done)
 	d.wg.Wait()

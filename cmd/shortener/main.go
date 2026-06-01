@@ -1,3 +1,19 @@
+// Команда shortener запускает сервис сокращения URL.
+//
+// Сервис предоставляет HTTP API для создания коротких URL и перенаправления по ним.
+// Поддерживает несколько типов хранилищ: in-memory, файл и базу данных.
+//
+// Флаги командной строки:
+//
+//	-a — адрес сервера (по умолчанию ":8080")
+//	-b — базовый URL для коротких ссылок (по умолчанию "http://localhost:8080")
+//	-f — путь к файлу хранилища (по умолчанию "data/storage.json")
+//	-d — строка подключения к БД (по умолчанию пусто)
+//	-s — секретный ключ для JWT (по умолчанию пусто)
+//	-audit-file — путь к файлу аудита
+//	-audit-url — URL для отправки событий аудита
+//
+// Переменные окружения имеют приоритет над флагами командной строки.
 package main
 
 import (
@@ -16,6 +32,8 @@ func main() {
 	fpath := flag.String("f", "data/storage.json", "File Path")
 	dbDSN := flag.String("d", "", "DB Data Source Name")
 	authSecret := flag.String("s", "", "Auth secret")
+	auditFile := flag.String("audit-file", "", "Audit file path")
+	auditURL := flag.String("audit-url", "", "Audit remote URL")
 
 	flag.Parse()
 
@@ -30,6 +48,8 @@ func main() {
 		FilePath:      *fpath,
 		DBDSN:         *dbDSN,
 		AuthSecret:    *authSecret,
+		AuditFile:     *auditFile,
+		AuditURL:      *auditURL,
 	})
 
 	a, err := app.New(cfg)

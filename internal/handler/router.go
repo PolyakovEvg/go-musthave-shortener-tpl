@@ -1,3 +1,4 @@
+// Package handler предоставляет HTTP-хендлеры для сервиса сокращения URL.
 package handler
 
 import (
@@ -5,6 +6,7 @@ import (
 	authmw "PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/logger"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/audit"
 	service "PolyakovEvg/go-musthave-shortener-tpl/internal/service/deleter"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 	"encoding/json"
@@ -17,19 +19,35 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// URLHandler обрабатывает HTTP-запросы для сокращения URL.
+// Содержит зависимости для работы с сервисами URL, аудита и удаления.
 type URLHandler struct {
-	service *url.URLService
-	config  *config.Config
-	logger  *logger.Logger
-	deleter *service.Deleter
+	urlService   *url.URLService
+	auditService *audit.AuditService
+	config       *config.Config
+	logger       *logger.Logger
+	deleter      *service.Deleter
 }
+
+// shortenRequest — запрос на сокращение URL в формате JSON.
 type shortenRequest struct {
 	URL string `json:"url"`
 }
+
+// shortenResponse — ответ с сокращённым URL.
 type shortenResponse struct {
 	Result string `json:"result"`
 }
 
+// Register регистрирует все маршруты хендлера на маршрутизаторе.
+// Маршруты:
+//   - POST / — сокращение URL (text/plain)
+//   - GET /{id} — редирект на оригинальный URL
+//   - POST /api/shorten — сокращение URL (JSON)
+//   - GET /ping — проверка соединения с БД
+//   - POST /api/shorten/batch — пакетное сокращение URL
+//   - GET /api/user/urls — получение URL пользователя
+//   - DELETE /api/user/urls — удаление URL пользователя
 func (h *URLHandler) Register(r chi.Router) {
 	r.Post("/", h.shortenURL)
 	r.Get("/{id}", h.redirectURL)
@@ -48,12 +66,19 @@ func (h *URLHandler) Register(r chi.Router) {
 	})
 }
 
-func NewURLHandler(svc *url.URLService, deleter *service.Deleter, cfg *config.Config, logg *logger.Logger) *URLHandler {
+// NewURLHandler создаёт новый экземпляр URLHandler с указанными зависимостями.
+func NewURLHandler(
+	urlService *url.URLService,
+	auditService *audit.AuditService,
+	deleter *service.Deleter,
+	cfg *config.Config,
+	logg *logger.Logger) *URLHandler {
 	return &URLHandler{
-		service: svc,
-		deleter: deleter,
-		config:  cfg,
-		logger:  logg,
+		urlService:   urlService,
+		auditService: auditService,
+		deleter:      deleter,
+		config:       cfg,
+		logger:       logg,
 	}
 }
 
@@ -85,7 +110,7 @@ func (h *URLHandler) shortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.service.SaveShorten(userID, originalURL)
+	shortURL, err := h.urlService.SaveShorten(userID, originalURL)
 
 	if err != nil {
 		if errors.Is(err, repository.ErrConflict) {
@@ -110,6 +135,9 @@ func (h *URLHandler) shortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	event := audit.NewAuditEvent(audit.ActionShorten, userID, originalURL)
+	h.auditService.Notify(event)
+
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
@@ -119,7 +147,7 @@ func (h *URLHandler) redirectURL(w http.ResponseWriter, r *http.Request) {
 	shortID := chi.URLParam(r, "id")
 
 	shortID = strings.TrimPrefix(shortID, "/")
-	rec, err := h.service.GetOriginal(shortID)
+	rec, err := h.urlService.GetOriginal(shortID)
 
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
@@ -130,6 +158,10 @@ func (h *URLHandler) redirectURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusGone), http.StatusGone)
 		return
 	}
+
+	userID, _ := authmw.UserIDFromContext(r.Context())
+	event := audit.NewAuditEvent(audit.ActionFollow, userID, rec.OriginalURL)
+	h.auditService.Notify(event)
 
 	http.Redirect(w, r, rec.OriginalURL, http.StatusTemporaryRedirect)
 }
@@ -168,7 +200,7 @@ func (h *URLHandler) postShorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.service.SaveShorten(userID, req.URL)
+	shortURL, err := h.urlService.SaveShorten(userID, req.URL)
 
 	if err != nil {
 		if errors.Is(err, repository.ErrConflict) {
@@ -189,6 +221,9 @@ func (h *URLHandler) postShorten(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+
+	event := audit.NewAuditEvent(audit.ActionShorten, userID, req.URL)
+	h.auditService.Notify(event)
 
 	resp := shortenResponse{
 		Result: shortURL,
