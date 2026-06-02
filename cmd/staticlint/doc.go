@@ -15,7 +15,7 @@ Usage:
 
 	go build -o staticlint ./cmd/staticlint
 
-	staticlint ./...
+	./staticlint ./...
 
 Analyzer osexit reports direct calls to os.Exit
 inside function main of package main.
