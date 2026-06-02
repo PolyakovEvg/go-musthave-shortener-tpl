@@ -26,7 +26,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	printBuildInfo()
 	serverAddr := flag.String("a", ":8080", "Server address")
 	baseURL := flag.String("b", "http://localhost:8080", "Base URL")
 	fpath := flag.String("f", "data/storage.json", "File Path")
@@ -63,4 +70,18 @@ func main() {
 	if err := a.Run(); err != nil {
 		log.Fatalf("app run failed: %v", err)
 	}
+}
+
+func printBuildInfo() {
+	log.Printf("Build version: %s\nBuild date: %s\nBuild commit: %s\n",
+		getBuildValue(buildVersion),
+		getBuildValue(buildDate),
+		getBuildValue(buildCommit))
+}
+
+func getBuildValue(v string) string {
+	if v == "" {
+		return "N/A"
+	}
+	return v
 }
