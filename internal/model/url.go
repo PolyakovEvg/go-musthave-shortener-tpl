@@ -1,6 +1,7 @@
 // Package model содержит структуры данных для сервиса сокращения URL.
 package model
 
+// generate:reset
 // URL представляет запись о сокращённом URL.
 type URL struct {
 	// ShortURL — короткий идентификатор URL.
