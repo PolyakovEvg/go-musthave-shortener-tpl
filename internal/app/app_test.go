@@ -2,10 +2,11 @@ package app
 
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
-	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -199,21 +200,15 @@ func TestApp_Run_ServerStart(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	if err := app.server.Shutdown(ctx); err != nil {
-		t.Errorf("shutdown error: %v", err)
-	}
-
-	app.Deleter.Close()
+	p, _ := os.FindProcess(os.Getpid())
+	p.Signal(syscall.SIGTERM)
 
 	select {
 	case err := <-errCh:
-		if err != nil && err != http.ErrServerClosed {
+		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(3 * time.Second):
 		t.Error("server did not shut down in time")
 	}
 }

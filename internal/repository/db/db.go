@@ -163,6 +163,11 @@ func (r *DBRepository) MarkDeleted(userID string, shorts []string) error {
 	return err
 }
 
+// Close закрывает соединение с базой данных.
+func (r *DBRepository) Close() error {
+	return r.db.Close()
+}
+
 func runMigrations(db *sql.DB) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {

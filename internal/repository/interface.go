@@ -29,4 +29,7 @@ type Repository interface {
 	// MarkDeleted помечает указанные URL как удалённые.
 	// Удалять может только владелец URL.
 	MarkDeleted(userID string, shortIDs []string) error
+
+	// Close закрывает соединение с хранилищем и сохраняет несохранённые данные.
+	Close() error
 }

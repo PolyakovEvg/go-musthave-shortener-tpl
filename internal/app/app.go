@@ -3,8 +3,12 @@
 package app
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
 	auth "PolyakovEvg/go-musthave-shortener-tpl/internal/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
@@ -26,11 +30,12 @@ import (
 )
 
 // App представляет основное приложение сервиса.
-// Содержит конфигурацию, HTTP-сервер, логгер и сервис удаления URL.
+// Содержит конфигурацию, HTTP-сервер, логгер, хранилище и сервис удаления URL.
 type App struct {
 	cfg    *config.Config
 	server *http.Server
 	logger *logger.Logger
+	repo   repository.Repository
 	// Deleter — сервис асинхронного удаления URL.
 	Deleter *service.Deleter
 }
@@ -46,8 +51,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	repo, err := initRepository(cfg, logg)
 	if err != nil {
-
-		logg.Zap.Fatalf("can't initialize file repository %v", err)
+		logg.Zap.Fatalf("can't initialize repository: %v", err)
 	}
 
 	deleter := service.NewDeleter(repo.MarkDeleted, logg)
@@ -84,27 +88,60 @@ func New(cfg *config.Config) (*App, error) {
 		cfg:     cfg,
 		server:  server,
 		logger:  logg,
+		repo:    repo,
 		Deleter: deleter,
 	}, nil
 }
 
 // Run запускает HTTP-сервер и блокирует выполнение до остановки сервера.
-// При завершении синхронизирует логи.
+// Обрабатывает сигналы SIGTERM, SIGINT, SIGQUIT для graceful shutdown.
+// При завершении сохраняет несохранённые данные и синхронизирует логи.
 // Если включён HTTPS (EnableHTTPS), использует ListenAndServeTLS.
 func (a *App) Run() error {
 	defer a.logger.Zap.Sync()
 
-	a.logger.Zap.Infow("starting server",
-		"addr", a.cfg.ServerAddress,
-		"url", a.cfg.BaseURL,
-		"https", a.cfg.EnableHTTPS,
-	)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer stop()
 
-	if a.cfg.EnableHTTPS {
-		return a.server.ListenAndServeTLS(a.cfg.CertFile, a.cfg.KeyFile)
+	go func() {
+		a.logger.Zap.Infow("starting server",
+			"addr", a.cfg.ServerAddress,
+			"url", a.cfg.BaseURL,
+			"https", a.cfg.EnableHTTPS,
+		)
+
+		var err error
+		if a.cfg.EnableHTTPS {
+			err = a.server.ListenAndServeTLS(a.cfg.CertFile, a.cfg.KeyFile)
+		} else {
+			err = a.server.ListenAndServe()
+		}
+
+		if err != nil && err != http.ErrServerClosed {
+			a.logger.Zap.Fatalf("server error: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+
+	a.logger.Zap.Info("shutting down server gracefully...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := a.server.Shutdown(shutdownCtx); err != nil {
+		a.logger.Zap.Errorf("server shutdown error: %v", err)
 	}
 
-	return a.server.ListenAndServe()
+	a.Deleter.Close()
+
+	if err := a.repo.Close(); err != nil {
+		a.logger.Zap.Errorf("repository close error: %v", err)
+	}
+
+	a.logger.Zap.Info("server stopped")
+
+	return nil
 }
 
 func initRepository(cfg *config.Config, logg *logger.Logger) (repository.Repository, error) {

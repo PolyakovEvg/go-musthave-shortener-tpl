@@ -293,6 +293,10 @@ func (m *mockRepo) MarkDeleted(userID string, shorts []string) error {
 	return nil
 }
 
+func (m *mockRepo) Close() error {
+	return nil
+}
+
 func TestURLService_SaveBatch_Error(t *testing.T) {
 	mock := &mockRepo{saveBatchErr: errors.New("batch error")}
 	service := NewURLService(mock, "http://localhost:8080/")
