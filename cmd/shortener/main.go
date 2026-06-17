@@ -15,8 +15,9 @@
 //	-audit-url — URL для отправки событий аудита
 //	-cert-file — путь к файлу сертификата TLS
 //	-key-file — путь к файлу приватного ключа TLS
+//	-c, -config — путь к файлу конфигурации JSON
 //
-// Переменные окружения имеют приоритет над флагами командной строки.
+// Приоритет конфигурации: переменные окружения > флаги > JSON-файл > значения по умолчанию.
 package main
 
 import (
@@ -37,9 +38,9 @@ var (
 
 func main() {
 	printBuildInfo()
-	serverAddr := flag.String("a", ":8080", "Server address")
-	baseURL := flag.String("b", "http://localhost:8080", "Base URL")
-	fpath := flag.String("f", "data/storage.json", "File Path")
+	serverAddr := flag.String("a", "", "Server address")
+	baseURL := flag.String("b", "", "Base URL")
+	fpath := flag.String("f", "", "File Path")
 	dbDSN := flag.String("d", "", "DB Data Source Name")
 	enableHTTPS := flag.Bool("s", false, "Enable HTTPS")
 	authSecret := flag.String("secret", "", "Auth secret")
@@ -47,6 +48,8 @@ func main() {
 	auditURL := flag.String("audit-url", "", "Audit remote URL")
 	certFile := flag.String("cert-file", "", "Path to TLS certificate file")
 	keyFile := flag.String("key-file", "", "Path to TLS private key file")
+	configFile := flag.String("c", "", "Path to JSON config file")
+	flag.StringVar(configFile, "config", "", "Path to JSON config file (alias for -c)")
 
 	flag.Parse()
 
@@ -66,6 +69,7 @@ func main() {
 		EnableHTTPS:   *enableHTTPS,
 		CertFile:      *certFile,
 		KeyFile:       *keyFile,
+		ConfigFile:    *configFile,
 	})
 
 	a, err := app.New(cfg)

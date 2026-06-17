@@ -1,8 +1,9 @@
 // Package config предоставляет конфигурацию для сервиса сокращения URL.
-// Поддерживает загрузку параметров из переменных окружения и флагов командной строки.
+// Поддерживает загрузку параметров из JSON-файла, переменных окружения и флагов командной строки.
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 )
@@ -29,6 +30,17 @@ type Config struct {
 	CertFile string
 	// KeyFile — путь к файлу приватного ключа TLS.
 	KeyFile string
+	// ConfigFile — путь к файлу конфигурации JSON.
+	ConfigFile string
+}
+
+// jsonConfig представляет структуру JSON-файла конфигурации.
+type jsonConfig struct {
+	ServerAddress   string `json:"server_address"`
+	BaseURL         string `json:"base_url"`
+	FileStoragePath string `json:"file_storage_path"`
+	DatabaseDSN     string `json:"database_dsn"`
+	EnableHTTPS     bool   `json:"enable_https"`
 }
 
 // Константы для имён переменных окружения.
@@ -53,10 +65,12 @@ const (
 	EnvCertFile string = "CERT_FILE"
 	// EnvKeyFile — переменная окружения для пути к файлу ключа.
 	EnvKeyFile string = "KEY_FILE"
+	// EnvConfig — переменная окружения для пути к файлу конфигурации.
+	EnvConfig string = "CONFIG"
 )
 
 // NewConfig создаёт новую конфигурацию с значениями по умолчанию.
-// Приоритет: переменные окружения > переданные параметры > значения по умолчанию.
+// Приоритет: переменные окружения > флаги > JSON-файл > значения по умолчанию.
 func NewConfig(params Config) *Config {
 	cfg := &Config{
 		ServerAddress: ":8080",
@@ -66,77 +80,112 @@ func NewConfig(params Config) *Config {
 		AuthSecret:    "",
 	}
 
-	envAddr, ok := os.LookupEnv(EnvServerAddress)
-	if ok {
-		cfg.ServerAddress = envAddr
-	} else if params.ServerAddress != "" {
-		cfg.ServerAddress = params.ServerAddress
+	configFile, ok := os.LookupEnv(EnvConfig)
+	if !ok && params.ConfigFile != "" {
+		configFile = params.ConfigFile
 	}
 
-	envBaseURL, ok := os.LookupEnv(EnvBaseURL)
-	if ok {
-		cfg.BaseURL = envBaseURL
-	} else if params.BaseURL != "" {
-		cfg.BaseURL = params.BaseURL
+	if configFile != "" {
+		loadJSONConfig(cfg, configFile)
 	}
 
-	envFilePath, ok := os.LookupEnv(EnvFilePath)
-	if ok {
-		cfg.FilePath = envFilePath
-	} else if params.FilePath != "" {
-		cfg.FilePath = params.FilePath
-	}
+	applyParams(cfg, params)
 
-	envDB, ok := os.LookupEnv(EnvDB)
-	if ok {
-		cfg.DBDSN = envDB
-	} else if params.DBDSN != "" {
-		cfg.DBDSN = params.DBDSN
-	}
-
-	envAuthSecret, ok := os.LookupEnv(EnvAuthSecret)
-	if ok {
-		cfg.AuthSecret = envAuthSecret
-	} else if params.AuthSecret != "" {
-		cfg.AuthSecret = params.AuthSecret
-	}
-
-	envAuditFile, ok := os.LookupEnv(EnvAuditFile)
-	if ok {
-		cfg.AuditFile = envAuditFile
-	} else if params.AuditFile != "" {
-		cfg.AuditFile = params.AuditFile
-	}
-
-	envAuditURL, ok := os.LookupEnv(EnvAuditURL)
-	if ok {
-		cfg.AuditURL = envAuditURL
-	} else if params.AuditURL != "" {
-		cfg.AuditURL = params.AuditURL
-	}
-
-	envEnableHTTPS := os.Getenv(EnvEnableHTTPS)
-	if envEnableHTTPS == "true" {
-		cfg.EnableHTTPS = true
-	} else if params.EnableHTTPS {
-		cfg.EnableHTTPS = true
-	}
-
-	envCertFile, ok := os.LookupEnv(EnvCertFile)
-	if ok {
-		cfg.CertFile = envCertFile
-	} else if params.CertFile != "" {
-		cfg.CertFile = params.CertFile
-	}
-
-	envKeyFile, ok := os.LookupEnv(EnvKeyFile)
-	if ok {
-		cfg.KeyFile = envKeyFile
-	} else if params.KeyFile != "" {
-		cfg.KeyFile = params.KeyFile
-	}
+	applyEnvVars(cfg)
 
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/") + "/"
 
 	return cfg
+}
+
+func loadJSONConfig(cfg *Config, filePath string) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return
+	}
+
+	var jc jsonConfig
+	if err := json.Unmarshal(data, &jc); err != nil {
+		return
+	}
+
+	if jc.ServerAddress != "" {
+		cfg.ServerAddress = jc.ServerAddress
+	}
+	if jc.BaseURL != "" {
+		cfg.BaseURL = jc.BaseURL
+	}
+	if jc.FileStoragePath != "" {
+		cfg.FilePath = jc.FileStoragePath
+	}
+	if jc.DatabaseDSN != "" {
+		cfg.DBDSN = jc.DatabaseDSN
+	}
+	cfg.EnableHTTPS = jc.EnableHTTPS
+}
+
+func applyParams(cfg *Config, params Config) {
+	if params.ServerAddress != "" {
+		cfg.ServerAddress = params.ServerAddress
+	}
+	if params.BaseURL != "" {
+		cfg.BaseURL = params.BaseURL
+	}
+	if params.FilePath != "" {
+		cfg.FilePath = params.FilePath
+	}
+	if params.DBDSN != "" {
+		cfg.DBDSN = params.DBDSN
+	}
+	if params.AuthSecret != "" {
+		cfg.AuthSecret = params.AuthSecret
+	}
+	if params.AuditFile != "" {
+		cfg.AuditFile = params.AuditFile
+	}
+	if params.AuditURL != "" {
+		cfg.AuditURL = params.AuditURL
+	}
+	if params.EnableHTTPS {
+		cfg.EnableHTTPS = true
+	}
+	if params.CertFile != "" {
+		cfg.CertFile = params.CertFile
+	}
+	if params.KeyFile != "" {
+		cfg.KeyFile = params.KeyFile
+	}
+}
+
+func applyEnvVars(cfg *Config) {
+	if envAddr, ok := os.LookupEnv(EnvServerAddress); ok {
+		cfg.ServerAddress = envAddr
+	}
+	if envBaseURL, ok := os.LookupEnv(EnvBaseURL); ok {
+		cfg.BaseURL = envBaseURL
+	}
+	if envFilePath, ok := os.LookupEnv(EnvFilePath); ok {
+		cfg.FilePath = envFilePath
+	}
+	if envDB, ok := os.LookupEnv(EnvDB); ok {
+		cfg.DBDSN = envDB
+	}
+	if envAuthSecret, ok := os.LookupEnv(EnvAuthSecret); ok {
+		cfg.AuthSecret = envAuthSecret
+	}
+	if envAuditFile, ok := os.LookupEnv(EnvAuditFile); ok {
+		cfg.AuditFile = envAuditFile
+	}
+	if envAuditURL, ok := os.LookupEnv(EnvAuditURL); ok {
+		cfg.AuditURL = envAuditURL
+	}
+	if envEnableHTTPS, ok := os.LookupEnv(EnvEnableHTTPS); ok && envEnableHTTPS == "true" {
+		cfg.EnableHTTPS = true
+	}
+	if envCertFile, ok := os.LookupEnv(EnvCertFile); ok {
+		cfg.CertFile = envCertFile
+	}
+	if envKeyFile, ok := os.LookupEnv(EnvKeyFile); ok {
+		cfg.KeyFile = envKeyFile
+	}
 }
