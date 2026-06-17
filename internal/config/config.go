@@ -23,6 +23,12 @@ type Config struct {
 	AuditFile string
 	// AuditURL — URL для отправки событий аудита по HTTP.
 	AuditURL string
+	// EnableHTTPS — флаг включения HTTPS.
+	EnableHTTPS bool
+	// CertFile — путь к файлу сертификата TLS.
+	CertFile string
+	// KeyFile — путь к файлу приватного ключа TLS.
+	KeyFile string
 }
 
 // Константы для имён переменных окружения.
@@ -41,6 +47,12 @@ const (
 	EnvAuditFile string = "AUDIT_FILE"
 	// EnvAuditURL — переменная окружения для URL аудита.
 	EnvAuditURL string = "AUDIT_URL"
+	// EnvEnableHTTPS — переменная окружения для включения HTTPS.
+	EnvEnableHTTPS string = "ENABLE_HTTPS"
+	// EnvCertFile — переменная окружения для пути к файлу сертификата.
+	EnvCertFile string = "CERT_FILE"
+	// EnvKeyFile — переменная окружения для пути к файлу ключа.
+	EnvKeyFile string = "KEY_FILE"
 )
 
 // NewConfig создаёт новую конфигурацию с значениями по умолчанию.
@@ -101,6 +113,27 @@ func NewConfig(params Config) *Config {
 		cfg.AuditURL = envAuditURL
 	} else if params.AuditURL != "" {
 		cfg.AuditURL = params.AuditURL
+	}
+
+	envEnableHTTPS := os.Getenv(EnvEnableHTTPS)
+	if envEnableHTTPS == "true" {
+		cfg.EnableHTTPS = true
+	} else if params.EnableHTTPS {
+		cfg.EnableHTTPS = true
+	}
+
+	envCertFile, ok := os.LookupEnv(EnvCertFile)
+	if ok {
+		cfg.CertFile = envCertFile
+	} else if params.CertFile != "" {
+		cfg.CertFile = params.CertFile
+	}
+
+	envKeyFile, ok := os.LookupEnv(EnvKeyFile)
+	if ok {
+		cfg.KeyFile = envKeyFile
+	} else if params.KeyFile != "" {
+		cfg.KeyFile = params.KeyFile
 	}
 
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/") + "/"

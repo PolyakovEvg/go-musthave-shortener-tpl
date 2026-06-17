@@ -9,9 +9,12 @@
 //	-b — базовый URL для коротких ссылок (по умолчанию "http://localhost:8080")
 //	-f — путь к файлу хранилища (по умолчанию "data/storage.json")
 //	-d — строка подключения к БД (по умолчанию пусто)
-//	-s — секретный ключ для JWT (по умолчанию пусто)
+//	-s — включить HTTPS (по умолчанию false)
+//	-secret — секретный ключ для JWT (по умолчанию пусто)
 //	-audit-file — путь к файлу аудита
 //	-audit-url — URL для отправки событий аудита
+//	-cert-file — путь к файлу сертификата TLS
+//	-key-file — путь к файлу приватного ключа TLS
 //
 // Переменные окружения имеют приоритет над флагами командной строки.
 package main
@@ -38,9 +41,12 @@ func main() {
 	baseURL := flag.String("b", "http://localhost:8080", "Base URL")
 	fpath := flag.String("f", "data/storage.json", "File Path")
 	dbDSN := flag.String("d", "", "DB Data Source Name")
-	authSecret := flag.String("s", "", "Auth secret")
+	enableHTTPS := flag.Bool("s", false, "Enable HTTPS")
+	authSecret := flag.String("secret", "", "Auth secret")
 	auditFile := flag.String("audit-file", "", "Audit file path")
 	auditURL := flag.String("audit-url", "", "Audit remote URL")
+	certFile := flag.String("cert-file", "", "Path to TLS certificate file")
+	keyFile := flag.String("key-file", "", "Path to TLS private key file")
 
 	flag.Parse()
 
@@ -57,6 +63,9 @@ func main() {
 		AuthSecret:    *authSecret,
 		AuditFile:     *auditFile,
 		AuditURL:      *auditURL,
+		EnableHTTPS:   *enableHTTPS,
+		CertFile:      *certFile,
+		KeyFile:       *keyFile,
 	})
 
 	a, err := app.New(cfg)

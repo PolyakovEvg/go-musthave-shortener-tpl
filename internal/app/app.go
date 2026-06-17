@@ -90,13 +90,19 @@ func New(cfg *config.Config) (*App, error) {
 
 // Run запускает HTTP-сервер и блокирует выполнение до остановки сервера.
 // При завершении синхронизирует логи.
+// Если включён HTTPS (EnableHTTPS), использует ListenAndServeTLS.
 func (a *App) Run() error {
 	defer a.logger.Zap.Sync()
 
 	a.logger.Zap.Infow("starting server",
 		"addr", a.cfg.ServerAddress,
 		"url", a.cfg.BaseURL,
+		"https", a.cfg.EnableHTTPS,
 	)
+
+	if a.cfg.EnableHTTPS {
+		return a.server.ListenAndServeTLS(a.cfg.CertFile, a.cfg.KeyFile)
+	}
 
 	return a.server.ListenAndServe()
 }
