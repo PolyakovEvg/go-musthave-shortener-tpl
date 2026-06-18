@@ -5,6 +5,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -24,14 +25,14 @@ type Config struct {
 	AuditFile string
 	// AuditURL — URL для отправки событий аудита по HTTP.
 	AuditURL string
-	// EnableHTTPS — флаг включения HTTPS.
-	EnableHTTPS bool
 	// CertFile — путь к файлу сертификата TLS.
 	CertFile string
 	// KeyFile — путь к файлу приватного ключа TLS.
 	KeyFile string
 	// ConfigFile — путь к файлу конфигурации JSON.
 	ConfigFile string
+	// EnableHTTPS — флаг включения HTTPS. nil означает, что флаг не был задан.
+	EnableHTTPS *bool
 }
 
 // jsonConfig представляет структуру JSON-файла конфигурации.
@@ -71,7 +72,8 @@ const (
 
 // NewConfig создаёт новую конфигурацию с значениями по умолчанию.
 // Приоритет: переменные окружения > флаги > JSON-файл > значения по умолчанию.
-func NewConfig(params Config) *Config {
+// Возвращает ошибку, если не удалось прочитать или разобрать JSON-файл конфигурации.
+func NewConfig(params Config) (*Config, error) {
 	cfg := &Config{
 		ServerAddress: ":8080",
 		BaseURL:       "http://localhost:8080/",
@@ -85,28 +87,35 @@ func NewConfig(params Config) *Config {
 		configFile = params.ConfigFile
 	}
 
-	if configFile != "" {
-		loadJSONConfig(cfg, configFile)
+	if configFile == "" {
+		applyParams(cfg, params)
+		applyEnvVars(cfg)
+		cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/") + "/"
+		return cfg, nil
+	}
+
+	if err := loadJSONConfig(cfg, configFile); err != nil {
+		return nil, err
 	}
 
 	applyParams(cfg, params)
-
 	applyEnvVars(cfg)
-
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/") + "/"
 
-	return cfg
+	return cfg, nil
 }
 
-func loadJSONConfig(cfg *Config, filePath string) {
+func loadJSONConfig(cfg *Config, filePath string) error {
 	data, err := os.ReadFile(filePath)
+
 	if err != nil {
-		return
+		return err
 	}
 
 	var jc jsonConfig
+
 	if err := json.Unmarshal(data, &jc); err != nil {
-		return
+		return err
 	}
 
 	if jc.ServerAddress != "" {
@@ -121,7 +130,9 @@ func loadJSONConfig(cfg *Config, filePath string) {
 	if jc.DatabaseDSN != "" {
 		cfg.DBDSN = jc.DatabaseDSN
 	}
-	cfg.EnableHTTPS = jc.EnableHTTPS
+	cfg.EnableHTTPS = &jc.EnableHTTPS
+
+	return nil
 }
 
 func applyParams(cfg *Config, params Config) {
@@ -146,8 +157,8 @@ func applyParams(cfg *Config, params Config) {
 	if params.AuditURL != "" {
 		cfg.AuditURL = params.AuditURL
 	}
-	if params.EnableHTTPS {
-		cfg.EnableHTTPS = true
+	if params.EnableHTTPS != nil {
+		cfg.EnableHTTPS = params.EnableHTTPS
 	}
 	if params.CertFile != "" {
 		cfg.CertFile = params.CertFile
@@ -179,8 +190,10 @@ func applyEnvVars(cfg *Config) {
 	if envAuditURL, ok := os.LookupEnv(EnvAuditURL); ok {
 		cfg.AuditURL = envAuditURL
 	}
-	if envEnableHTTPS, ok := os.LookupEnv(EnvEnableHTTPS); ok && envEnableHTTPS == "true" {
-		cfg.EnableHTTPS = true
+	if envEnableHTTPS, ok := os.LookupEnv(EnvEnableHTTPS); ok {
+		if enabled, err := strconv.ParseBool(envEnableHTTPS); err == nil {
+			cfg.EnableHTTPS = &enabled
+		}
 	}
 	if envCertFile, ok := os.LookupEnv(EnvCertFile); ok {
 		cfg.CertFile = envCertFile

@@ -9,7 +9,7 @@
 //	-b — базовый URL для коротких ссылок (по умолчанию "http://localhost:8080")
 //	-f — путь к файлу хранилища (по умолчанию "data/storage.json")
 //	-d — строка подключения к БД (по умолчанию пусто)
-//	-s — включить HTTPS (по умолчанию false)
+//	-s — включить HTTPS (требует -cert-file и -key-file)
 //	-secret — секретный ключ для JWT (по умолчанию пусто)
 //	-audit-file — путь к файлу аудита
 //	-audit-url — URL для отправки событий аудита
@@ -21,13 +21,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
+	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/app"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
 
 	"github.com/joho/godotenv"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -58,7 +64,7 @@ func main() {
 		log.Println("No .env file found, using environment variables")
 	}
 
-	cfg := config.NewConfig(config.Config{
+	cfg, err := config.NewConfig(config.Config{
 		ServerAddress: *serverAddr,
 		BaseURL:       *baseURL,
 		FilePath:      *fpath,
@@ -66,11 +72,15 @@ func main() {
 		AuthSecret:    *authSecret,
 		AuditFile:     *auditFile,
 		AuditURL:      *auditURL,
-		EnableHTTPS:   *enableHTTPS,
+		EnableHTTPS:   getFlagIfSet(enableHTTPS, "s"),
 		CertFile:      *certFile,
 		KeyFile:       *keyFile,
 		ConfigFile:    *configFile,
 	})
+
+	if err != nil {
+		log.Fatalf("config init failed: %v", err)
+	}
 
 	a, err := app.New(cfg)
 
@@ -78,10 +88,30 @@ func main() {
 		log.Fatalf("app init failed: %v", err)
 	}
 
-	defer a.Deleter.Close()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer stop()
 
-	if err := a.Run(); err != nil {
-		log.Fatalf("app run failed: %v", err)
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		if err := a.Run(); err != nil && err != http.ErrServerClosed {
+			return err
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		<-ctx.Done()
+		log.Println("received shutdown signal")
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		return a.Shutdown(shutdownCtx)
+	})
+
+	if err := g.Wait(); err != nil {
+		log.Fatalf("error: %v", err)
 	}
 }
 
@@ -97,4 +127,16 @@ func getBuildValue(v string) string {
 		return "N/A"
 	}
 	return v
+}
+
+// getFlagIfSet возвращает указатель на значение флага, если он был явно задан.
+// Используется для различения "флаг не задан" (nil) и "флаг задан как false".
+func getFlagIfSet[T any](flagValue *T, flagName string) *T {
+	var result *T
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == flagName {
+			result = flagValue
+		}
+	})
+	return result
 }

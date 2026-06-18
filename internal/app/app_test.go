@@ -2,13 +2,14 @@ package app
 
 import (
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
+	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 func TestNew_MemoryStorage(t *testing.T) {
@@ -193,22 +194,23 @@ func TestApp_Run_ServerStart(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- app.Run()
-	}()
+	var g errgroup.Group
 
-	time.Sleep(100 * time.Millisecond)
-
-	p, _ := os.FindProcess(os.Getpid())
-	p.Signal(syscall.SIGTERM)
-
-	select {
-	case err := <-errCh:
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+	g.Go(func() error {
+		if err := app.Run(); err != nil && err != http.ErrServerClosed {
+			return err
 		}
-	case <-time.After(3 * time.Second):
-		t.Error("server did not shut down in time")
+		return nil
+	})
+
+	g.Go(func() error {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		return app.Shutdown(shutdownCtx)
+	})
+
+	if err := g.Wait(); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

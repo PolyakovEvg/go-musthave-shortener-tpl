@@ -3,6 +3,8 @@ package repository
 
 import "PolyakovEvg/go-musthave-shortener-tpl/internal/model"
 
+//go:generate mockgen -source=interface.go -destination=mocks/mock_repository.go -package=mocks Repository
+
 // Repository определяет интерфейс для хранения и получения сокращённых URL.
 // Реализации должны быть потокобезопасными.
 type Repository interface {

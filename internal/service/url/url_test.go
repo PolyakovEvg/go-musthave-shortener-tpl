@@ -1,11 +1,15 @@
 package url
 
 import (
+	"errors"
+	"testing"
+
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/model"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
-	"errors"
-	"testing"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/mocks"
+
+	"go.uber.org/mock/gomock"
 )
 
 func TestURLService_SaveShorten(t *testing.T) {
@@ -89,8 +93,15 @@ func TestURLService_SaveShorten_SameURL(t *testing.T) {
 }
 
 func TestURLService_SaveShorten_Conflict(t *testing.T) {
-	mock := &mockRepo{saveErr: repository.ErrConflict, saveReturnID: "abc123"}
-	service := NewURLService(mock, "http://localhost:8080/")
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRepository(ctrl)
+	mockRepo.EXPECT().
+		Save("user1", "https://example.com").
+		Return("abc123", repository.ErrConflict)
+
+	service := NewURLService(mockRepo, "http://localhost:8080/")
 
 	shortURL, err := service.SaveShorten("user1", "https://example.com")
 	if err == nil {
@@ -242,64 +253,16 @@ func TestURLService_PingRepository(t *testing.T) {
 	}
 }
 
-type mockRepo struct {
-	saveErr      error
-	saveReturnID string
-	saveBatchErr error
-	getByUserErr error
-	pingErr      error
-}
-
-func (m *mockRepo) Save(userID, original string) (string, error) {
-	if m.saveErr != nil {
-		if m.saveReturnID != "" {
-			return m.saveReturnID, m.saveErr
-		}
-		return "", m.saveErr
-	}
-	return "abc123", nil
-}
-
-func (m *mockRepo) SaveBatch(userID string, batch []model.BatchRequest) ([]model.BatchResponse, error) {
-	if m.saveBatchErr != nil {
-		return nil, m.saveBatchErr
-	}
-	responses := make([]model.BatchResponse, len(batch))
-	for i, b := range batch {
-		responses[i] = model.BatchResponse{
-			CorrelationID: b.CorrelationID,
-			ShortURL:      "abc123",
-		}
-	}
-	return responses, nil
-}
-
-func (m *mockRepo) Ping() error {
-	return m.pingErr
-}
-
-func (m *mockRepo) Get(shortURL string) (*model.URL, bool) {
-	return nil, false
-}
-
-func (m *mockRepo) GetByUser(userID string) ([]model.URL, error) {
-	if m.getByUserErr != nil {
-		return nil, m.getByUserErr
-	}
-	return []model.URL{}, nil
-}
-
-func (m *mockRepo) MarkDeleted(userID string, shorts []string) error {
-	return nil
-}
-
-func (m *mockRepo) Close() error {
-	return nil
-}
-
 func TestURLService_SaveBatch_Error(t *testing.T) {
-	mock := &mockRepo{saveBatchErr: errors.New("batch error")}
-	service := NewURLService(mock, "http://localhost:8080/")
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRepository(ctrl)
+	mockRepo.EXPECT().
+		SaveBatch("user1", gomock.Any()).
+		Return(nil, errors.New("batch error"))
+
+	service := NewURLService(mockRepo, "http://localhost:8080/")
 
 	batch := []model.BatchRequest{
 		{CorrelationID: "1", OriginalURL: "https://example.com"},
@@ -312,8 +275,15 @@ func TestURLService_SaveBatch_Error(t *testing.T) {
 }
 
 func TestURLService_GetUserURLs_Error(t *testing.T) {
-	mock := &mockRepo{getByUserErr: errors.New("get by user error")}
-	service := NewURLService(mock, "http://localhost:8080/")
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRepository(ctrl)
+	mockRepo.EXPECT().
+		GetByUser("user1").
+		Return(nil, errors.New("get by user error"))
+
+	service := NewURLService(mockRepo, "http://localhost:8080/")
 
 	_, err := service.GetUserURLs("user1")
 	if err == nil {
@@ -322,8 +292,15 @@ func TestURLService_GetUserURLs_Error(t *testing.T) {
 }
 
 func TestURLService_PingRepository_Error(t *testing.T) {
-	mock := &mockRepo{pingErr: errors.New("ping error")}
-	service := NewURLService(mock, "http://localhost:8080/")
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRepository(ctrl)
+	mockRepo.EXPECT().
+		Ping().
+		Return(errors.New("ping error"))
+
+	service := NewURLService(mockRepo, "http://localhost:8080/")
 
 	err := service.PingRepository()
 	if err == nil {
@@ -332,8 +309,15 @@ func TestURLService_PingRepository_Error(t *testing.T) {
 }
 
 func TestURLService_Save_Error(t *testing.T) {
-	mock := &mockRepo{saveErr: errors.New("save error")}
-	service := NewURLService(mock, "http://localhost:8080/")
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockRepo := mocks.NewMockRepository(ctrl)
+	mockRepo.EXPECT().
+		Save("user1", "https://example.com").
+		Return("", errors.New("save error"))
+
+	service := NewURLService(mockRepo, "http://localhost:8080/")
 
 	_, err := service.SaveShorten("user1", "https://example.com")
 	if err == nil {
