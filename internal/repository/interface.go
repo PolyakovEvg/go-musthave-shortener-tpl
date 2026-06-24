@@ -3,6 +3,8 @@ package repository
 
 import "PolyakovEvg/go-musthave-shortener-tpl/internal/model"
 
+//go:generate mockgen -source=interface.go -destination=mocks/mock_repository.go -package=mocks Repository
+
 // Repository определяет интерфейс для хранения и получения сокращённых URL.
 // Реализации должны быть потокобезопасными.
 type Repository interface {
@@ -29,4 +31,7 @@ type Repository interface {
 	// MarkDeleted помечает указанные URL как удалённые.
 	// Удалять может только владелец URL.
 	MarkDeleted(userID string, shortIDs []string) error
+
+	// Close закрывает соединение с хранилищем и сохраняет несохранённые данные.
+	Close() error
 }

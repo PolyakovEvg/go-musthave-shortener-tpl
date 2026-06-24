@@ -243,3 +243,10 @@ func (r *FileRepository) flush() error {
 
 	return nil
 }
+
+// Close закрывает файловое хранилище и сохраняет все данные.
+func (r *FileRepository) Close() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.flush()
+}

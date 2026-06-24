@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 func TestNew_MemoryStorage(t *testing.T) {
@@ -192,28 +194,23 @@ func TestApp_Run_ServerStart(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- app.Run()
-	}()
+	var g errgroup.Group
 
-	time.Sleep(100 * time.Millisecond)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	if err := app.server.Shutdown(ctx); err != nil {
-		t.Errorf("shutdown error: %v", err)
-	}
-
-	app.Deleter.Close()
-
-	select {
-	case err := <-errCh:
-		if err != nil && err != http.ErrServerClosed {
-			t.Errorf("unexpected error: %v", err)
+	g.Go(func() error {
+		if err := app.Run(); err != nil && err != http.ErrServerClosed {
+			return err
 		}
-	case <-time.After(2 * time.Second):
-		t.Error("server did not shut down in time")
+		return nil
+	})
+
+	g.Go(func() error {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		return app.Shutdown(shutdownCtx)
+	})
+
+	if err := g.Wait(); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

@@ -137,3 +137,8 @@ func (mr *MemoryRepository) MarkDeleted(userID string, shorts []string) error {
 	}
 	return nil
 }
+
+// Close закрывает хранилище в памяти. Ничего не делает.
+func (mr *MemoryRepository) Close() error {
+	return nil
+}

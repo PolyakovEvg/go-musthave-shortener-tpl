@@ -9,21 +9,31 @@
 //	-b — базовый URL для коротких ссылок (по умолчанию "http://localhost:8080")
 //	-f — путь к файлу хранилища (по умолчанию "data/storage.json")
 //	-d — строка подключения к БД (по умолчанию пусто)
-//	-s — секретный ключ для JWT (по умолчанию пусто)
+//	-s — включить HTTPS (требует -cert-file и -key-file)
+//	-secret — секретный ключ для JWT (по умолчанию пусто)
 //	-audit-file — путь к файлу аудита
 //	-audit-url — URL для отправки событий аудита
+//	-cert-file — путь к файлу сертификата TLS
+//	-key-file — путь к файлу приватного ключа TLS
+//	-c, -config — путь к файлу конфигурации JSON
 //
-// Переменные окружения имеют приоритет над флагами командной строки.
+// Приоритет конфигурации: переменные окружения > флаги > JSON-файл > значения по умолчанию.
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
+	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/app"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
 
 	"github.com/joho/godotenv"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -34,13 +44,18 @@ var (
 
 func main() {
 	printBuildInfo()
-	serverAddr := flag.String("a", ":8080", "Server address")
-	baseURL := flag.String("b", "http://localhost:8080", "Base URL")
-	fpath := flag.String("f", "data/storage.json", "File Path")
+	serverAddr := flag.String("a", "", "Server address")
+	baseURL := flag.String("b", "", "Base URL")
+	fpath := flag.String("f", "", "File Path")
 	dbDSN := flag.String("d", "", "DB Data Source Name")
-	authSecret := flag.String("s", "", "Auth secret")
+	enableHTTPS := flag.Bool("s", false, "Enable HTTPS")
+	authSecret := flag.String("secret", "", "Auth secret")
 	auditFile := flag.String("audit-file", "", "Audit file path")
 	auditURL := flag.String("audit-url", "", "Audit remote URL")
+	certFile := flag.String("cert-file", "", "Path to TLS certificate file")
+	keyFile := flag.String("key-file", "", "Path to TLS private key file")
+	configFile := flag.String("c", "", "Path to JSON config file")
+	flag.StringVar(configFile, "config", "", "Path to JSON config file (alias for -c)")
 
 	flag.Parse()
 
@@ -49,7 +64,7 @@ func main() {
 		log.Println("No .env file found, using environment variables")
 	}
 
-	cfg := config.NewConfig(config.Config{
+	cfg, err := config.NewConfig(config.Config{
 		ServerAddress: *serverAddr,
 		BaseURL:       *baseURL,
 		FilePath:      *fpath,
@@ -57,7 +72,15 @@ func main() {
 		AuthSecret:    *authSecret,
 		AuditFile:     *auditFile,
 		AuditURL:      *auditURL,
+		EnableHTTPS:   getFlagIfSet(enableHTTPS, "s"),
+		CertFile:      *certFile,
+		KeyFile:       *keyFile,
+		ConfigFile:    *configFile,
 	})
+
+	if err != nil {
+		log.Fatalf("config init failed: %v", err)
+	}
 
 	a, err := app.New(cfg)
 
@@ -65,10 +88,30 @@ func main() {
 		log.Fatalf("app init failed: %v", err)
 	}
 
-	defer a.Deleter.Close()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	defer stop()
 
-	if err := a.Run(); err != nil {
-		log.Fatalf("app run failed: %v", err)
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		if err := a.Run(); err != nil && err != http.ErrServerClosed {
+			return err
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		<-ctx.Done()
+		log.Println("received shutdown signal")
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		return a.Shutdown(shutdownCtx)
+	})
+
+	if err := g.Wait(); err != nil {
+		log.Fatalf("error: %v", err)
 	}
 }
 
@@ -84,4 +127,16 @@ func getBuildValue(v string) string {
 		return "N/A"
 	}
 	return v
+}
+
+// getFlagIfSet возвращает указатель на значение флага, если он был явно задан.
+// Используется для различения "флаг не задан" (nil) и "флаг задан как false".
+func getFlagIfSet[T any](flagValue *T, flagName string) *T {
+	var result *T
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == flagName {
+			result = flagValue
+		}
+	})
+	return result
 }

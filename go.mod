@@ -11,7 +11,9 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/joho/godotenv v1.5.1
 	github.com/kisielk/errcheck v1.20.0
+	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.1
+	golang.org/x/sync v0.21.0
 	golang.org/x/tools v0.45.0
 	honnef.co/go/tools v0.7.0
 )
@@ -25,6 +27,5 @@ require (
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20231108232855-2478ac86f678 // indirect
 	golang.org/x/mod v0.36.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 )
