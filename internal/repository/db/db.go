@@ -168,6 +168,23 @@ func (r *DBRepository) Close() error {
 	return r.db.Close()
 }
 
+// GetStats возвращает статистику сервиса: количество URL и пользователей.
+func (r *DBRepository) GetStats() (model.Stats, error) {
+	var stats model.Stats
+
+	err := r.db.QueryRow(`SELECT COUNT(*) FROM shorten_urls`).Scan(&stats.URLs)
+	if err != nil {
+		return stats, fmt.Errorf("failed to count URLs: %w", err)
+	}
+
+	err = r.db.QueryRow(`SELECT COUNT(DISTINCT user_id) FROM shorten_urls`).Scan(&stats.Users)
+	if err != nil {
+		return stats, fmt.Errorf("failed to count users: %w", err)
+	}
+
+	return stats, nil
+}
+
 func runMigrations(db *sql.DB) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {

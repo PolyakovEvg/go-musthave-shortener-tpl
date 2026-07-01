@@ -33,6 +33,8 @@ type Config struct {
 	ConfigFile string
 	// EnableHTTPS — флаг включения HTTPS. nil означает, что флаг не был задан.
 	EnableHTTPS *bool
+	// TrustedSubnet — доверенная подсеть в формате CIDR (например, "192.168.1.0/24").
+	TrustedSubnet string
 }
 
 // jsonConfig представляет структуру JSON-файла конфигурации.
@@ -42,6 +44,7 @@ type jsonConfig struct {
 	FileStoragePath string `json:"file_storage_path"`
 	DatabaseDSN     string `json:"database_dsn"`
 	EnableHTTPS     bool   `json:"enable_https"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 }
 
 // Константы для имён переменных окружения.
@@ -68,6 +71,8 @@ const (
 	EnvKeyFile string = "KEY_FILE"
 	// EnvConfig — переменная окружения для пути к файлу конфигурации.
 	EnvConfig string = "CONFIG"
+	// EnvTrustedSubnet — переменная окружения для доверенной подсети.
+	EnvTrustedSubnet string = "TRUSTED_SUBNET"
 )
 
 // NewConfig создаёт новую конфигурацию с значениями по умолчанию.
@@ -132,6 +137,10 @@ func loadJSONConfig(cfg *Config, filePath string) error {
 	}
 	cfg.EnableHTTPS = &jc.EnableHTTPS
 
+	if jc.TrustedSubnet != "" {
+		cfg.TrustedSubnet = jc.TrustedSubnet
+	}
+
 	return nil
 }
 
@@ -165,6 +174,9 @@ func applyParams(cfg *Config, params Config) {
 	}
 	if params.KeyFile != "" {
 		cfg.KeyFile = params.KeyFile
+	}
+	if params.TrustedSubnet != "" {
+		cfg.TrustedSubnet = params.TrustedSubnet
 	}
 }
 
@@ -200,5 +212,8 @@ func applyEnvVars(cfg *Config) {
 	}
 	if envKeyFile, ok := os.LookupEnv(EnvKeyFile); ok {
 		cfg.KeyFile = envKeyFile
+	}
+	if envTrustedSubnet, ok := os.LookupEnv(EnvTrustedSubnet); ok {
+		cfg.TrustedSubnet = envTrustedSubnet
 	}
 }
