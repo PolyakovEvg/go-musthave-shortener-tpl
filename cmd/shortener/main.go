@@ -16,6 +16,7 @@
 //	-cert-file — путь к файлу сертификата TLS
 //	-key-file — путь к файлу приватного ключа TLS
 //	-c, -config — путь к файлу конфигурации JSON
+//	-t — доверенная подсеть в формате CIDR (например, "192.168.1.0/24")
 //
 // Приоритет конфигурации: переменные окружения > флаги > JSON-файл > значения по умолчанию.
 package main
@@ -56,6 +57,7 @@ func main() {
 	keyFile := flag.String("key-file", "", "Path to TLS private key file")
 	configFile := flag.String("c", "", "Path to JSON config file")
 	flag.StringVar(configFile, "config", "", "Path to JSON config file (alias for -c)")
+	trustedSubnet := flag.String("t", "", "Trusted subnet in CIDR format")
 
 	flag.Parse()
 
@@ -76,6 +78,7 @@ func main() {
 		CertFile:      *certFile,
 		KeyFile:       *keyFile,
 		ConfigFile:    *configFile,
+		TrustedSubnet: *trustedSubnet,
 	})
 
 	if err != nil {

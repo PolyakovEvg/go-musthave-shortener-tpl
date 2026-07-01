@@ -80,8 +80,11 @@ func New(cfg *config.Config) (*App, error) {
 	auditService := audit.NewAuditService(logg)
 	initObservers(cfg, logg, auditService)
 
-	handler := handler.NewURLHandler(urlService, auditService, deleter, cfg, logg)
-	handler.Register(r)
+	urlHandler := handler.NewURLHandler(urlService, auditService, deleter, cfg, logg)
+	urlHandler.Register(r)
+
+	statsHandler := handler.NewStatsHandler(repo, cfg.TrustedSubnet)
+	r.Get("/api/internal/stats", statsHandler.GetStats)
 
 	server := &http.Server{
 		Addr:    cfg.ServerAddress,

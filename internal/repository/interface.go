@@ -34,4 +34,7 @@ type Repository interface {
 
 	// Close закрывает соединение с хранилищем и сохраняет несохранённые данные.
 	Close() error
+
+	// GetStats возвращает статистику сервиса: количество URL и пользователей.
+	GetStats() (model.Stats, error)
 }

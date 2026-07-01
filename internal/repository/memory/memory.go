@@ -142,3 +142,14 @@ func (mr *MemoryRepository) MarkDeleted(userID string, shorts []string) error {
 func (mr *MemoryRepository) Close() error {
 	return nil
 }
+
+// GetStats возвращает статистику сервиса: количество URL и пользователей.
+func (mr *MemoryRepository) GetStats() (model.Stats, error) {
+	mr.mu.RLock()
+	defer mr.mu.RUnlock()
+
+	return model.Stats{
+		URLs:  len(mr.data),
+		Users: len(mr.byUser),
+	}, nil
+}
