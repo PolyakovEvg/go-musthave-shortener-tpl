@@ -35,6 +35,8 @@ type Config struct {
 	EnableHTTPS *bool
 	// TrustedSubnet — доверенная подсеть в формате CIDR (например, "192.168.1.0/24").
 	TrustedSubnet string
+	// GRPCAddress — адрес gRPC сервера в формате host:port (например, ":9090").
+	GRPCAddress string
 }
 
 // jsonConfig представляет структуру JSON-файла конфигурации.
@@ -73,6 +75,8 @@ const (
 	EnvConfig string = "CONFIG"
 	// EnvTrustedSubnet — переменная окружения для доверенной подсети.
 	EnvTrustedSubnet string = "TRUSTED_SUBNET"
+	// EnvGRPCAddress — переменная окружения для адреса gRPC сервера.
+	EnvGRPCAddress string = "GRPC_ADDRESS"
 )
 
 // NewConfig создаёт новую конфигурацию с значениями по умолчанию.
@@ -178,6 +182,9 @@ func applyParams(cfg *Config, params Config) {
 	if params.TrustedSubnet != "" {
 		cfg.TrustedSubnet = params.TrustedSubnet
 	}
+	if params.GRPCAddress != "" {
+		cfg.GRPCAddress = params.GRPCAddress
+	}
 }
 
 func applyEnvVars(cfg *Config) {
@@ -215,5 +222,8 @@ func applyEnvVars(cfg *Config) {
 	}
 	if envTrustedSubnet, ok := os.LookupEnv(EnvTrustedSubnet); ok {
 		cfg.TrustedSubnet = envTrustedSubnet
+	}
+	if envGRPCAddress, ok := os.LookupEnv(EnvGRPCAddress); ok {
+		cfg.GRPCAddress = envGRPCAddress
 	}
 }

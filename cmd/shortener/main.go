@@ -1,6 +1,6 @@
 // Команда shortener запускает сервис сокращения URL.
 //
-// Сервис предоставляет HTTP API для создания коротких URL и перенаправления по ним.
+// Сервис предоставляет HTTP API и gRPC API для создания коротких URL и перенаправления по ним.
 // Поддерживает несколько типов хранилищ: in-memory, файл и базу данных.
 //
 // Флаги командной строки:
@@ -17,6 +17,7 @@
 //	-key-file — путь к файлу приватного ключа TLS
 //	-c, -config — путь к файлу конфигурации JSON
 //	-t — доверенная подсеть в формате CIDR (например, "192.168.1.0/24")
+//	-g — адрес gRPC сервера (по умолчанию пусто, gRPC не запускается)
 //
 // Приоритет конфигурации: переменные окружения > флаги > JSON-файл > значения по умолчанию.
 package main
@@ -58,6 +59,7 @@ func main() {
 	configFile := flag.String("c", "", "Path to JSON config file")
 	flag.StringVar(configFile, "config", "", "Path to JSON config file (alias for -c)")
 	trustedSubnet := flag.String("t", "", "Trusted subnet in CIDR format")
+	grpcAddr := flag.String("g", "", "gRPC server address")
 
 	flag.Parse()
 
@@ -79,6 +81,7 @@ func main() {
 		KeyFile:       *keyFile,
 		ConfigFile:    *configFile,
 		TrustedSubnet: *trustedSubnet,
+		GRPCAddress:   *grpcAddr,
 	})
 
 	if err != nil {
@@ -98,6 +101,14 @@ func main() {
 
 	g.Go(func() error {
 		if err := a.Run(); err != nil && err != http.ErrServerClosed {
+			return err
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		if err := a.RunGRPC(); err != nil {
+			log.Printf("gRPC server error: %v", err)
 			return err
 		}
 		return nil
