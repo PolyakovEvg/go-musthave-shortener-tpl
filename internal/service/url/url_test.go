@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/apperrors"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/model"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository/memory"
@@ -109,8 +110,9 @@ func TestURLService_SaveShorten_Conflict(t *testing.T) {
 		return
 	}
 
-	if !errors.Is(err, repository.ErrConflict) {
-		t.Errorf("expected ErrConflict, got %v", err)
+	// Проверяем, что сервис возвращает ошибку уровня приложения
+	if !errors.Is(err, apperrors.ErrURLConflict) {
+		t.Errorf("expected ErrURLConflict, got %v", err)
 	}
 
 	if shortURL != "http://localhost:8080/abc123" {
@@ -150,8 +152,9 @@ func TestURLService_GetOriginal_NotFound(t *testing.T) {
 		return
 	}
 
-	if err.Error() != "not found original URL" {
-		t.Errorf("unexpected error message: %v", err)
+	// Проверяем, что сервис возвращает ошибку уровня приложения
+	if !errors.Is(err, apperrors.ErrURLNotFound) {
+		t.Errorf("expected ErrURLNotFound, got %v", err)
 	}
 }
 
@@ -195,8 +198,9 @@ func TestURLService_SaveBatch_Empty(t *testing.T) {
 		return
 	}
 
-	if err.Error() != "empty batch" {
-		t.Errorf("unexpected error message: %v", err)
+	// Проверяем, что сервис возвращает ошибку уровня приложения
+	if !errors.Is(err, apperrors.ErrEmptyBatch) {
+		t.Errorf("expected ErrEmptyBatch, got %v", err)
 	}
 }
 
@@ -238,8 +242,9 @@ func TestURLService_GetUserURLs_EmptyUserID(t *testing.T) {
 		return
 	}
 
-	if err.Error() != "empty user id" {
-		t.Errorf("unexpected error message: %v", err)
+	// Проверяем, что сервис возвращает ошибку уровня приложения
+	if !errors.Is(err, apperrors.ErrEmptyUserID) {
+		t.Errorf("expected ErrEmptyUserID, got %v", err)
 	}
 }
 
