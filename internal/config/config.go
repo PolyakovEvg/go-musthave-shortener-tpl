@@ -33,6 +33,10 @@ type Config struct {
 	ConfigFile string
 	// EnableHTTPS — флаг включения HTTPS. nil означает, что флаг не был задан.
 	EnableHTTPS *bool
+	// TrustedSubnet — доверенная подсеть в формате CIDR (например, "192.168.1.0/24").
+	TrustedSubnet string
+	// GRPCAddress — адрес gRPC сервера в формате host:port (например, ":9090").
+	GRPCAddress string
 }
 
 // jsonConfig представляет структуру JSON-файла конфигурации.
@@ -42,6 +46,8 @@ type jsonConfig struct {
 	FileStoragePath string `json:"file_storage_path"`
 	DatabaseDSN     string `json:"database_dsn"`
 	EnableHTTPS     bool   `json:"enable_https"`
+	TrustedSubnet   string `json:"trusted_subnet"`
+	GRPCAddress     string `json:"grpc_address"`
 }
 
 // Константы для имён переменных окружения.
@@ -68,6 +74,10 @@ const (
 	EnvKeyFile string = "KEY_FILE"
 	// EnvConfig — переменная окружения для пути к файлу конфигурации.
 	EnvConfig string = "CONFIG"
+	// EnvTrustedSubnet — переменная окружения для доверенной подсети.
+	EnvTrustedSubnet string = "TRUSTED_SUBNET"
+	// EnvGRPCAddress — переменная окружения для адреса gRPC сервера.
+	EnvGRPCAddress string = "GRPC_ADDRESS"
 )
 
 // NewConfig создаёт новую конфигурацию с значениями по умолчанию.
@@ -132,6 +142,13 @@ func loadJSONConfig(cfg *Config, filePath string) error {
 	}
 	cfg.EnableHTTPS = &jc.EnableHTTPS
 
+	if jc.TrustedSubnet != "" {
+		cfg.TrustedSubnet = jc.TrustedSubnet
+	}
+	if jc.GRPCAddress != "" {
+		cfg.GRPCAddress = jc.GRPCAddress
+	}
+
 	return nil
 }
 
@@ -165,6 +182,12 @@ func applyParams(cfg *Config, params Config) {
 	}
 	if params.KeyFile != "" {
 		cfg.KeyFile = params.KeyFile
+	}
+	if params.TrustedSubnet != "" {
+		cfg.TrustedSubnet = params.TrustedSubnet
+	}
+	if params.GRPCAddress != "" {
+		cfg.GRPCAddress = params.GRPCAddress
 	}
 }
 
@@ -200,5 +223,11 @@ func applyEnvVars(cfg *Config) {
 	}
 	if envKeyFile, ok := os.LookupEnv(EnvKeyFile); ok {
 		cfg.KeyFile = envKeyFile
+	}
+	if envTrustedSubnet, ok := os.LookupEnv(EnvTrustedSubnet); ok {
+		cfg.TrustedSubnet = envTrustedSubnet
+	}
+	if envGRPCAddress, ok := os.LookupEnv(EnvGRPCAddress); ok {
+		cfg.GRPCAddress = envGRPCAddress
 	}
 }

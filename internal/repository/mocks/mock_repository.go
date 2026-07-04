@@ -84,6 +84,21 @@ func (mr *MockRepositoryMockRecorder) GetByUser(userID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByUser", reflect.TypeOf((*MockRepository)(nil).GetByUser), userID)
 }
 
+// GetStats mocks base method.
+func (m *MockRepository) GetStats() (model.Stats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStats")
+	ret0, _ := ret[0].(model.Stats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStats indicates an expected call of GetStats.
+func (mr *MockRepositoryMockRecorder) GetStats() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStats", reflect.TypeOf((*MockRepository)(nil).GetStats))
+}
+
 // MarkDeleted mocks base method.
 func (m *MockRepository) MarkDeleted(userID string, shortIDs []string) error {
 	m.ctrl.T.Helper()

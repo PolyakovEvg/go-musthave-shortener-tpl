@@ -1,14 +1,17 @@
 // Package app предоставляет основное приложение сервиса сокращения URL.
-// Инициализирует все зависимости и запускает HTTP-сервер.
+// Инициализирует все зависимости и запускает HTTP- и gRPC-серверы.
 package app
 
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
 
 	auth "PolyakovEvg/go-musthave-shortener-tpl/internal/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
+	grpcserver "PolyakovEvg/go-musthave-shortener-tpl/internal/grpc"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/handler"
 	authmw "PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/compressor"
@@ -24,15 +27,20 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 // App представляет основное приложение сервиса.
-// Содержит конфигурацию, HTTP-сервер, логгер, хранилище и сервис удаления URL.
+// Содержит конфигурацию, HTTP-сервер, gRPC-сервер, логгер, хранилище и сервис удаления URL.
 type App struct {
-	cfg    *config.Config
-	server *http.Server
-	logger *logger.Logger
-	repo   repository.Repository
+	cfg        *config.Config
+	server     *http.Server
+	grpcServer *grpc.Server
+	grpcAddr   string
+	logger     *logger.Logger
+	repo       repository.Repository
+	urlService *url.URLService
 	// Deleter — сервис асинхронного удаления URL.
 	Deleter *service.Deleter
 }
@@ -80,20 +88,43 @@ func New(cfg *config.Config) (*App, error) {
 	auditService := audit.NewAuditService(logg)
 	initObservers(cfg, logg, auditService)
 
-	handler := handler.NewURLHandler(urlService, auditService, deleter, cfg, logg)
-	handler.Register(r)
+	urlHandler := handler.NewURLHandler(urlService, auditService, deleter, cfg, logg)
+	urlHandler.Register(r)
+
+	statsHandler := handler.NewStatsHandler(repo, cfg.TrustedSubnet)
+	r.Get("/api/internal/stats", statsHandler.GetStats)
 
 	server := &http.Server{
 		Addr:    cfg.ServerAddress,
 		Handler: r,
 	}
 
+	var grpcSrv *grpc.Server
+	if cfg.EnableHTTPS != nil && *cfg.EnableHTTPS && cfg.CertFile != "" && cfg.KeyFile != "" {
+		creds, err := credentials.NewServerTLSFromFile(cfg.CertFile, cfg.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load TLS credentials for gRPC: %w", err)
+		}
+		grpcSrv = grpc.NewServer(
+			grpc.Creds(creds),
+			grpc.UnaryInterceptor(grpcserver.AuthInterceptor(authManager)),
+		)
+	} else {
+		grpcSrv = grpc.NewServer(
+			grpc.UnaryInterceptor(grpcserver.AuthInterceptor(authManager)),
+		)
+	}
+	grpcserver.Register(grpcSrv, urlService, authManager)
+
 	return &App{
-		cfg:     cfg,
-		server:  server,
-		logger:  logg,
-		repo:    repo,
-		Deleter: deleter,
+		cfg:        cfg,
+		server:     server,
+		grpcServer: grpcSrv,
+		grpcAddr:   cfg.GRPCAddress,
+		logger:     logg,
+		repo:       repo,
+		urlService: urlService,
+		Deleter:    deleter,
 	}, nil
 }
 
@@ -112,10 +143,30 @@ func (a *App) Run() error {
 	return a.server.ListenAndServe()
 }
 
+// RunGRPC запускает gRPC-сервер.
+func (a *App) RunGRPC() error {
+	if a.grpcAddr == "" {
+		return nil
+	}
+
+	a.logger.Zap.Infow("starting gRPC server", "addr", a.grpcAddr)
+
+	listener, err := net.Listen("tcp", a.grpcAddr)
+	if err != nil {
+		return err
+	}
+
+	return a.grpcServer.Serve(listener)
+}
+
 // Shutdown останавливает HTTP-сервер и закрывает все ресурсы.
 // Принимает контекст для таймаута завершения.
 func (a *App) Shutdown(ctx context.Context) error {
 	a.logger.Zap.Info("shutting down server gracefully...")
+
+	if a.grpcServer != nil {
+		a.grpcServer.GracefulStop()
+	}
 
 	if err := a.server.Shutdown(ctx); err != nil {
 		a.logger.Zap.Errorf("server shutdown error: %v", err)

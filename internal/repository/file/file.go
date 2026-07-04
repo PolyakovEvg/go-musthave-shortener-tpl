@@ -250,3 +250,21 @@ func (r *FileRepository) Close() error {
 	defer r.mu.Unlock()
 	return r.flush()
 }
+
+// GetStats возвращает статистику сервиса: количество URL и пользователей.
+func (r *FileRepository) GetStats() (model.Stats, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	// https://www.bud1m.com/blog/go-empty-struct/
+	// https://medium.com/@aojharaj2004/understanding-gos-empty-struct-internal-working-5a4606e041b2
+	userSet := make(map[string]struct{})
+	for _, rec := range r.data {
+		userSet[rec.UserID] = struct{}{}
+	}
+
+	return model.Stats{
+		URLs:  len(r.data),
+		Users: len(userSet),
+	}, nil
+}
