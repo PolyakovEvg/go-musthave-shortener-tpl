@@ -2,10 +2,10 @@
 package handler
 
 import (
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/apperrors"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/config"
 	authmw "PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/auth"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/middleware/logger"
-	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/audit"
 	service "PolyakovEvg/go-musthave-shortener-tpl/internal/service/deleter"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
@@ -113,7 +113,7 @@ func (h *URLHandler) shortenURL(w http.ResponseWriter, r *http.Request) {
 	shortURL, err := h.urlService.SaveShorten(userID, originalURL)
 
 	if err != nil {
-		if errors.Is(err, repository.ErrConflict) {
+		if errors.Is(err, apperrors.ErrURLConflict) {
 			w.WriteHeader(http.StatusConflict)
 			w.Write([]byte(shortURL))
 			return
@@ -203,7 +203,7 @@ func (h *URLHandler) postShorten(w http.ResponseWriter, r *http.Request) {
 	shortURL, err := h.urlService.SaveShorten(userID, req.URL)
 
 	if err != nil {
-		if errors.Is(err, repository.ErrConflict) {
+		if errors.Is(err, apperrors.ErrURLConflict) {
 			resp := shortenResponse{
 				Result: shortURL,
 			}

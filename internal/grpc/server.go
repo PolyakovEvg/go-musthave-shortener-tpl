@@ -6,8 +6,8 @@ import (
 	"errors"
 
 	pb "PolyakovEvg/go-musthave-shortener-tpl/api/shortener"
+	"PolyakovEvg/go-musthave-shortener-tpl/internal/apperrors"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/auth"
-	"PolyakovEvg/go-musthave-shortener-tpl/internal/repository"
 	"PolyakovEvg/go-musthave-shortener-tpl/internal/service/url"
 
 	"google.golang.org/grpc"
@@ -52,7 +52,7 @@ func (s *ShortenerServer) ShortenURL(ctx context.Context, req *pb.URLShortenRequ
 	userID, _ := UserIDFromContext(ctx)
 	shortURL, err := s.urlSvc.SaveShorten(userID, req.Url)
 	if err != nil {
-		if errors.Is(err, repository.ErrConflict) {
+		if errors.Is(err, apperrors.ErrURLConflict) {
 			return &pb.URLShortenResponse{Result: shortURL}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "failed to save url: %v", err)
