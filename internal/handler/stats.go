@@ -32,9 +32,11 @@ func NewStatsHandler(repo repository.Repository, trustedSubnet string) *StatsHan
 }
 
 // statsResponse представляет ответ эндпоинта /api/internal/stats.
+// URLs — количество сокращённых URL в сервисе.
+// Users — количество пользователей в сервисе.
 type statsResponse struct {
-	URLs  int `json:"urls"`  // количество сокращённых URL в сервисе
-	Users int `json:"users"` // количество пользователей в сервисе
+	URLs  int `json:"urls"`
+	Users int `json:"users"`
 }
 
 // GetStats возвращает статистику сервиса.

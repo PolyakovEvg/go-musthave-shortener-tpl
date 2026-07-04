@@ -47,6 +47,7 @@ type jsonConfig struct {
 	DatabaseDSN     string `json:"database_dsn"`
 	EnableHTTPS     bool   `json:"enable_https"`
 	TrustedSubnet   string `json:"trusted_subnet"`
+	GRPCAddress     string `json:"grpc_address"`
 }
 
 // Константы для имён переменных окружения.
@@ -143,6 +144,9 @@ func loadJSONConfig(cfg *Config, filePath string) error {
 
 	if jc.TrustedSubnet != "" {
 		cfg.TrustedSubnet = jc.TrustedSubnet
+	}
+	if jc.GRPCAddress != "" {
+		cfg.GRPCAddress = jc.GRPCAddress
 	}
 
 	return nil

@@ -19,48 +19,18 @@ func AuthInterceptor(authMgr *auth.Manager) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
-			userID := uuid.New().String()
-			token, err := authMgr.GenerateToken(userID)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to generate token: %v", err)
-			}
-
-			trailer := metadata.New(map[string]string{"authorization": token})
-			grpc.SetTrailer(ctx, trailer)
-
-			ctx = context.WithValue(ctx, userIDKey, userID)
-			return handler(ctx, req)
+			return handleNewUser(ctx, req, authMgr, handler)
 		}
 
 		authValues := md.Get("authorization")
 		if len(authValues) == 0 {
-			userID := uuid.New().String()
-			token, err := authMgr.GenerateToken(userID)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to generate token: %v", err)
-			}
-
-			trailer := metadata.New(map[string]string{"authorization": token})
-			grpc.SetTrailer(ctx, trailer)
-
-			ctx = context.WithValue(ctx, userIDKey, userID)
-			return handler(ctx, req)
+			return handleNewUser(ctx, req, authMgr, handler)
 		}
 
 		userID, err := authMgr.ParseToken(authValues[0])
 		if err != nil {
 			if errors.Is(err, auth.ErrInvalidToken) {
-				userID = uuid.New().String()
-				token, genErr := authMgr.GenerateToken(userID)
-				if genErr != nil {
-					return nil, status.Errorf(codes.Internal, "failed to generate token: %v", genErr)
-				}
-
-				trailer := metadata.New(map[string]string{"authorization": token})
-				grpc.SetTrailer(ctx, trailer)
-
-				ctx = context.WithValue(ctx, userIDKey, userID)
-				return handler(ctx, req)
+				return handleNewUser(ctx, req, authMgr, handler)
 			}
 			return nil, status.Errorf(codes.Unauthenticated, "failed to parse token: %v", err)
 		}
@@ -68,4 +38,19 @@ func AuthInterceptor(authMgr *auth.Manager) grpc.UnaryServerInterceptor {
 		ctx = context.WithValue(ctx, userIDKey, userID)
 		return handler(ctx, req)
 	}
+}
+
+// handleNewUser создаёт нового пользователя, генерирует токен и устанавливает trailer.
+func handleNewUser(ctx context.Context, req interface{}, authMgr *auth.Manager, handler grpc.UnaryHandler) (interface{}, error) {
+	userID := uuid.New().String()
+	token, err := authMgr.GenerateToken(userID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to generate token: %v", err)
+	}
+
+	trailer := metadata.New(map[string]string{"authorization": token})
+	grpc.SetTrailer(ctx, trailer)
+
+	ctx = context.WithValue(ctx, userIDKey, userID)
+	return handler(ctx, req)
 }

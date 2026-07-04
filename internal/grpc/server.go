@@ -31,33 +31,29 @@ func UserIDFromContext(ctx context.Context) (string, bool) {
 // ShortenerServer реализует gRPC-сервис ShortenerService.
 type ShortenerServer struct {
 	pb.UnimplementedShortenerServiceServer
-	urlService *url.URLService
-	authMgr    *auth.Manager
+	urlSvc *url.URLService
+	auth   *auth.Manager
 }
 
 // NewShortenerServer создаёт новый gRPC-сервер с указанным сервисом URL.
-func NewShortenerServer(urlService *url.URLService, authMgr *auth.Manager) *ShortenerServer {
+func NewShortenerServer(urlSvc *url.URLService, auth *auth.Manager) *ShortenerServer {
 	return &ShortenerServer{
-		urlService: urlService,
-		authMgr:    authMgr,
+		urlSvc: urlSvc,
+		auth:   auth,
 	}
 }
 
 // ShortenURL сокращает URL и возвращает короткий URL.
 func (s *ShortenerServer) ShortenURL(ctx context.Context, req *pb.URLShortenRequest) (*pb.URLShortenResponse, error) {
-	userID, ok := UserIDFromContext(ctx)
-	if !ok || userID == "" {
-		return nil, status.Error(codes.Unauthenticated, "user id not found in context")
-	}
-
 	if req.Url == "" {
 		return nil, status.Error(codes.InvalidArgument, "url is empty")
 	}
 
-	shortURL, err := s.urlService.SaveShorten(userID, req.Url)
+	userID, _ := UserIDFromContext(ctx)
+	shortURL, err := s.urlSvc.SaveShorten(userID, req.Url)
 	if err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			return &pb.URLShortenResponse{Result: shortURL}, status.Error(codes.AlreadyExists, "url already exists")
+			return &pb.URLShortenResponse{Result: shortURL}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "failed to save url: %v", err)
 	}
@@ -71,7 +67,7 @@ func (s *ShortenerServer) ExpandURL(ctx context.Context, req *pb.URLExpandReques
 		return nil, status.Error(codes.InvalidArgument, "id is empty")
 	}
 
-	url, err := s.urlService.GetOriginal(req.Id)
+	url, err := s.urlSvc.GetOriginal(req.Id)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "url not found")
 	}
@@ -85,12 +81,8 @@ func (s *ShortenerServer) ExpandURL(ctx context.Context, req *pb.URLExpandReques
 
 // ListUserURLs возвращает все URL, созданные пользователем.
 func (s *ShortenerServer) ListUserURLs(ctx context.Context, req *emptypb.Empty) (*pb.UserURLsResponse, error) {
-	userID, ok := UserIDFromContext(ctx)
-	if !ok || userID == "" {
-		return nil, status.Error(codes.Unauthenticated, "user id not found in context")
-	}
-
-	urls, err := s.urlService.GetUserURLs(userID)
+	userID, _ := UserIDFromContext(ctx)
+	urls, err := s.urlSvc.GetUserURLs(userID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get user urls: %v", err)
 	}
